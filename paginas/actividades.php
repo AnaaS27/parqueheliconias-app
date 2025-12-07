@@ -1,72 +1,26 @@
 <?php
-session_start();
 include('../includes/header.php');
 
-// =========================
-// CONFIG SUPABASE
-// =========================
-$supabase_url = getenv("DATABASE_URL");
-$supabase_key = getenv("SUPABASE_KEY");
+// ======================================
+// CONSULTA A SUPABASE REST
+// ======================================
 
-if (!$supabase_url || !$supabase_key) {
-    die("❌ ERROR: Variables de entorno de Supabase no configuradas.");
-}
+// Recorridos
+[$codeRec, $recorridos] = supabase_get(
+    "actividades?categoria=eq.recorrido&activo=eq.true&order=id_actividad"
+);
 
-// -----------------------
-// Función GET Supabase
-// -----------------------
-function supabase_get($endpoint) {
-    global $supabase_url, $supabase_key;
+// Talleres
+[$codeTall, $talleres] = supabase_get(
+    "actividades?categoria=eq.taller&activo=eq.true&order=id_actividad"
+);
 
-    $url = $supabase_url . "/rest/v1/" . $endpoint;
-
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "apikey: $supabase_key",
-        "Authorization: Bearer $supabase_key",
-        "Content-Type: application/json"
-    ]);
-
-    $response = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    return [$code, json_decode($response, true)];
-}
-
-// =========================
-// OBTENER RECORRIDOS
-// =========================
-$endpoint_recorridos =
-    "actividades?activo=eq.true&categoria=eq.recorrido&order=id_actividad";
-
-[$code1, $recorridos] = supabase_get($endpoint_recorridos);
-
-if ($code1 !== 200) {
-    echo "<p>Error cargando recorridos ($code1)</p>";
-    $recorridos = [];
-}
-
-// =========================
-// OBTENER TALLERES
-// =========================
-$endpoint_talleres =
-    "actividades?activo=eq.true&categoria=eq.taller&order=id_actividad";
-
-[$code2, $talleres] = supabase_get($endpoint_talleres);
-
-if ($code2 !== 200) {
-    echo "<p>Error cargando talleres ($code2)</p>";
-    $talleres = [];
-}
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <title>Actividades - Parque Heliconias</title>
-
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;background:#f8f9fa}
@@ -97,12 +51,17 @@ body{font-family:Arial,sans-serif;background:#f8f9fa}
 
 <div class="container">
 
+<!-- ====================================== -->
+<!-- RECORRIDOS -->
+<!-- ====================================== -->
+
 <h2 class="seccion-titulo">Recorridos</h2>
 <div class="carrusel">
 <button class="flecha flecha-izq" onclick="moverCarrusel(this.parentElement,-1)">‹</button>
 
 <div class="carrusel-contenedor">
-<?php foreach ($recorridos as $item): ?>
+<?php if ($codeRec === 200 && !empty($recorridos)): ?>
+    <?php foreach($recorridos as $item): ?>
     <div class="tarjeta-chicaque">
         <div class="tarjeta-superior">
             <div class="imagen-container">
@@ -115,20 +74,27 @@ body{font-family:Arial,sans-serif;background:#f8f9fa}
             </div>
         </div>
     </div>
-<?php endforeach; ?>
+    <?php endforeach; ?>
+<?php else: ?>
+    <p style="padding:30px;">No hay recorridos disponibles.</p>
+<?php endif; ?>
 </div>
 
 <button class="flecha flecha-der" onclick="moverCarrusel(this.parentElement,1)">›</button>
 </div>
 
 
+<!-- ====================================== -->
+<!-- TALLERES -->
+<!-- ====================================== -->
+
 <h2 class="seccion-titulo" style="margin-top:100px">Talleres Educativos</h2>
 <div class="carrusel">
-
 <button class="flecha flecha-izq" onclick="moverCarrusel(this.parentElement,-1)">‹</button>
 
 <div class="carrusel-contenedor">
-<?php foreach ($talleres as $item): ?>
+<?php if ($codeTall === 200 && !empty($talleres)): ?>
+    <?php foreach($talleres as $item): ?>
     <div class="tarjeta-chicaque">
         <div class="tarjeta-superior">
             <div class="imagen-container">
@@ -141,7 +107,10 @@ body{font-family:Arial,sans-serif;background:#f8f9fa}
             </div>
         </div>
     </div>
-<?php endforeach; ?>
+    <?php endforeach; ?>
+<?php else: ?>
+    <p style="padding:30px;">No hay talleres disponibles.</p>
+<?php endif; ?>
 </div>
 
 <button class="flecha flecha-der" onclick="moverCarrusel(this.parentElement,1)">›</button>
