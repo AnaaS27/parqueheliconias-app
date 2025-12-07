@@ -1,19 +1,24 @@
 <?php
-include('../includes/header.php');
-include('../includes/conexion.php');
+include('../includes/header.php'); // Aquí ya está supabase_get()
 
 $id = intval($_GET['id'] ?? 0);
 
-$sql = "SELECT * FROM actividades WHERE id_actividad = $1";
-$res = pg_query_params($conn, $sql, [$id]);
+if ($id <= 0) {
+    die("<h2 style='text-align:center;margin:100px;color:red;'>ID inválido</h2>");
+}
 
-if (!$res || pg_num_rows($res) === 0) {
+/* ----------------------------------------------------------
+   🔍 CONSULTAR ACTIVIDAD DESDE SUPABASE
+-----------------------------------------------------------*/
+list($status, $data) = supabase_get("actividades?id_actividad=eq.$id&select=*");
+
+if ($status !== 200 || empty($data)) {
     die("<h2 style='text-align:center;margin:100px;color:red;'>Actividad no encontrada</h2>");
 }
 
-$item = pg_fetch_assoc($res);
+$item = $data[0];
 
-/* ✅ Evitar error de htmlspecialchars con NULL */
+// Evitar NULLs
 $descripcion = $item['descripcion'] ?? 'Descripción no disponible';
 ?>
 <!DOCTYPE html>
@@ -103,15 +108,21 @@ body{font-family:Arial;background:#f8f9fa;padding:40px}
 
 .grupo-input {
     margin-bottom: 30px;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: all 0.4s ease;
 }
 
-.grupo-input input {
-    width: 280px;
-    padding: 14px;
-    border-radius: 15px;
-    border: 1px solid #ccc;
-    font-size: 1rem;
-    outline: none;
+.grupo-input.activo {
+    max-height: 100px;
+    opacity: 1;
+}
+
+.mensaje-validacion {
+    margin-top: 15px;
+    font-weight: bold;
+    color: crimson;
 }
 
 .btn-reserva-moderna {
@@ -131,25 +142,6 @@ body{font-family:Arial;background:#f8f9fa;padding:40px}
     box-shadow: 0 10px 25px rgba(0,0,0,0.25);
 }
 
-.grupo-input {
-    margin-bottom: 30px;
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    transition: all 0.4s ease;
-}
-
-.grupo-input.activo {
-    max-height: 100px;
-    opacity: 1;
-}
-
-.mensaje-validacion {
-    margin-top: 15px;
-    font-weight: bold;
-    color: crimson;
-}
-
 .btn-reserva-moderna.cargando {
     pointer-events: none;
     opacity: 0.8;
@@ -158,7 +150,6 @@ body{font-family:Arial;background:#f8f9fa;padding:40px}
 .btn-reserva-moderna.cargando::after {
     content: " ⏳ Procesando...";
 }
-
 </style>
 </head>
 <body>
@@ -192,7 +183,7 @@ body{font-family:Arial;background:#f8f9fa;padding:40px}
 
             <div class="tipo-reserva-grid">
 
-                <!-- ✅ INDIVIDUAL -->
+                <!-- INDIVIDUAL -->
                 <label class="card-reserva">
                     <input type="radio" name="tipo_reserva" value="individual" checked>
                     <div class="card-contenido">
@@ -202,7 +193,7 @@ body{font-family:Arial;background:#f8f9fa;padding:40px}
                     </div>
                 </label>
 
-                <!-- ✅ GRUPAL -->
+                <!-- GRUPAL -->
                 <label class="card-reserva">
                     <input type="radio" name="tipo_reserva" value="grupal">
                     <div class="card-contenido">
@@ -214,7 +205,7 @@ body{font-family:Arial;background:#f8f9fa;padding:40px}
 
             </div>
 
-            <!-- ✅ INPUT ANIMADO PARA GRUPAL -->
+            <!-- Input animado para grupal -->
             <div class="grupo-input" id="grupoInput">
                 <input type="number" name="cantidad" min="2" placeholder="Cantidad de personas">
             </div>
@@ -256,24 +247,20 @@ form.addEventListener("submit", function (e) {
 
     mensaje.textContent = "";
 
-    // ✅ VALIDACIÓN PARA GRUPAL
     if (tipo === "grupal") {
         if (cantidad === "" || cantidad < 2) {
             e.preventDefault();
             mensaje.textContent = "⚠️ Debes ingresar al menos 2 personas.";
             return;
         }
-        // ✅ REDIRECCIÓN A GRUPAL
         form.action = "participantes_reserva.php";
     } else {
-        // ✅ REDIRECCIÓN A INDIVIDUAL
         form.action = "fecha_reserva.php";
     }
 
     boton.classList.add("cargando");
 });
 </script>
-
 
 </body>
 </html>
