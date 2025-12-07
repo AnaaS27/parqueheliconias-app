@@ -1,22 +1,55 @@
 <?php
 session_start();
-include('../includes/conexion.php');
-include('../includes/verificar_sesion.php');
+require_once('../includes/verificar_sesion.php');
 
-// Obtener datos del usuario actual
+// ===========================
+//  CONFIG DE SUPABASE
+// ===========================
+$supabase_url = getenv("SUPABASE_URL");
+$supabase_key = getenv("SUPABASE_KEY");
+
+// Función para hacer peticiones REST a Supabase
+function supabase_get($endpoint) {
+    global $supabase_url, $supabase_key;
+
+    $url = $supabase_url . "/rest/v1/" . $endpoint;
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "apikey: $supabase_key",
+        "Authorization: Bearer $supabase_key",
+        "Content-Type: application/json"
+    ]);
+
+    $response = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    return [$code, json_decode($response, true)];
+}
+
+// ===========================
+//  OBTENER DATOS DEL USUARIO
+// ===========================
+
 $id_usuario = $_SESSION['usuario_id'];
 
-$query = "SELECT nombre, apellido FROM usuarios WHERE id_usuario = $1";
-#$stmt = $conn->prepare($sql);
-#$stmt->bind_param("i", $id_usuario);
-#$stmt->execute();
-$result = pg_query_params($conn, $query, array($id_usuario));
-$usuario = pg_fetch_assoc($result);
+[$code, $data] = supabase_get("usuarios?id_usuario=eq.$id_usuario&select=nombre,apellido");
 
-// Mostrar mensaje solo si acaba de iniciar sesión
+if ($code !== 200 || empty($data)) {
+    // Error crítico
+    $usuario = ["nombre" => "Usuario", "apellido" => ""];
+} else {
+    $usuario = $data[0];
+}
+
+// Manejo de toast de bienvenida
 $mostrar_toast = isset($_SESSION['login_exitoso']) && $_SESSION['login_exitoso'] === true;
-unset($_SESSION['login_exitoso']); // eliminar para que no se repita
+unset($_SESSION['login_exitoso']);
+
 ?>
+
 
 <!DOCTYPE html>
 <html lang="es">

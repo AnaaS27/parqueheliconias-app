@@ -1,31 +1,114 @@
 <?php
-include('../includes/conexion.php');
+session_start();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $nombre = $_POST['nombre'];
-    $apellido = $_POST['apellido'];
-    $correo = $_POST['correo'];
-    $documento = $_POST['documento'];
-    $telefono = $_POST['telefono'];
-    $contrasena = $_POST['contrasena']; // sin hash aquí
+// ===========================
+// CONFIG - SUPABASE
+// ===========================
+$supabase_url = getenv("SUPABASE_URL");
+$supabase_key = getenv("SUPABASE_KEY");
 
-    // Query para insertar usando bcrypt en PostgreSQL
-    $sql = "INSERT INTO usuarios 
-            (nombre, apellido, correo, documento, telefono, contrasena, id_rol)
-            VALUES ($1, $2, $3, $4, $5, crypt($6, gen_salt('bf')), 2)";
+// Función para enviar datos a Supabase REST
+function supabase_post($endpoint, $data) {
+    global $supabase_url, $supabase_key;
 
-    $result = pg_query_params($conn, $sql, [
-        $nombre, $apellido, $correo, $documento, $telefono, $contrasena
+    $url = $supabase_url . "/rest/v1/" . $endpoint;
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "apikey: $supabase_key",
+        "Authorization: Bearer $supabase_key",
+        "Content-Type: application/json",
+        "Prefer: return=representation"  // devuelve el usuario recién creado
     ]);
 
-    if ($result) {
-        header("Location: login.php?registro=ok");
+    $response = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    return [$code, json_decode($response, true)];
+}
+
+// ===========================
+// PROCESAR REGISTRO
+// ===========================
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
+    $nombre = $_POST["nombre"];
+    $apellido = $_POST["apellido"];
+    $correo = $_POST["correo"];
+    $documento = $_POST["documento"];
+    $telefono = $_POST["telefono"];
+    $contrasena = $_POST["contrasena"];
+
+    // Validación simple
+    if (empty($nombre) || empty($apellido) || empty($correo) || empty($documento) || empty($contrasena)) {
+        $_SESSION["toast"] = ["tipo" => "warning", "mensaje" => "Todos los campos son obligatorios ⚠️"];
+        header("Location: registro.php");
+        exit;
+    }
+
+    // 1 — Verificar si el correo ya existe
+    $url = "usuarios?correo=eq." . urlencode($correo) . "&select=id_usuario";
+    $url_encoded = str_replace("+", "%20", $url);
+
+    $ch = curl_init($supabase_url . "/rest/v1/" . $url_encoded);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "apikey: $supabase_key",
+        "Authorization: Bearer $supabase_key",
+        "Content-Type: application/json"
+    ]);
+
+    $existing = json_decode(curl_exec($ch), true);
+    curl_close($ch);
+
+    if (!empty($existing)) {
+        $_SESSION["toast"] = ["tipo" => "error", "mensaje" => "El correo ya está registrado ❌"];
+        header("Location: registro.php");
+        exit;
+    }
+
+    // 2 — Encriptar contraseña (bcrypt)
+    $password_hash = password_hash($contrasena, PASSWORD_BCRYPT);
+
+    // 3 — Insertar usuario por REST
+    [$status, $data] = supabase_post("usuarios", [
+        "nombre" => $nombre,
+        "apellido" => $apellido,
+        "correo" => $correo,
+        "documento" => $documento,
+        "telefono" => $telefono,
+        "contrasena" => $password_hash,
+        "id_rol" => 2, // usuario normal
+        "usuario_activo" => true,
+        "fecha_registro" => date("c")
+    ]);
+
+    // 4 — Ver resultado
+    if ($status === 201) {
+        $_SESSION["toast"] = [
+            "tipo" => "success",
+            "mensaje" => "¡Registro exitoso! Ahora puedes iniciar sesión 🌿"
+        ];
+        header("Location: login.php");
         exit;
     } else {
-        $error = "Error al registrarse: " . pg_last_error($conn);
+        $_SESSION["toast"] = [
+            "tipo" => "error",
+            "mensaje" => "Error al registrar usuario ❌"
+        ];
+        header("Location: registro.php");
+        exit;
     }
 }
 ?>
+
+<!-- AQUI SIGUE TU HTML DE REGISTRO NORMAL --> 
+
 
 
 <!DOCTYPE html>
