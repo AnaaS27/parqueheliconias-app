@@ -21,12 +21,12 @@ if (!isset($_POST['id_actividad'])) {
     exit;
 }
 
-$id_usuario      = $_SESSION['usuario_id'];
+$id_usuario = $_SESSION['usuario_id'];
 
-// ===============================
-// 🔍 Obtener datos del usuario
-// ===============================
-[$codeUser, $userData] = supabase_get("usuarios?id_usuario=eq.$id_usuario&select=nombre,apellido");
+/* =============================================================
+   🔍 1. OBTENER DATOS DEL USUARIO DESDE SUPABASE
+   ============================================================= */
+[$codeUser, $userData] = supabase_get("usuarios?id_usuario=eq.$id_usuario&select=nombre,apellido,documento");
 
 if ($codeUser !== 200 || empty($userData)) {
     echo "<script>
@@ -39,25 +39,23 @@ if ($codeUser !== 200 || empty($userData)) {
 $nombre   = $userData[0]["nombre"];
 $apellido = $userData[0]["apellido"];
 
-$id_actividad    = intval($_POST['id_actividad']);
-$tipo_reserva    = "individual";
+/* =============================================================
+   🔹 2. DATOS VENIDOS DEL FORMULARIO
+   ============================================================= */
+$id_actividad      = intval($_POST['id_actividad']);
+$fecha_visita      = $_POST['fecha_visita'];
+$tipo_documento    = $_POST['tipo_documento'];
+$documento         = $_POST['numero_identificacion']; // este sí viene del form
+$fecha_nacimiento  = $_POST['fecha_nacimiento'];
+$id_genero         = $_POST['sexo'];
+$id_ciudad         = $_POST['id_ciudad'];
+$telefono          = $_POST['telefono'];
 
-$fecha_visita       = $_POST['fecha_visita'];
-$tipo_documento     = $_POST['tipo_documento'];
-$documento          = $_POST['numero_identificacion'];
-$fecha_nacimiento   = $_POST['fecha_nacimiento'];
-$id_genero          = $_POST['sexo'];
-$id_ciudad          = $_POST['id_ciudad'];
-$telefono           = $_POST['telefono'];
-
-$institucion        = !empty($_POST['institucion']) ? intval($_POST['institucion']) : null;
-$observaciones      = $_POST['observaciones'] ?? null;
-
-$nombre             = $_POST['nombre'] ?? "";
-$apellido           = $_POST['apellido'] ?? "";
+$institucion       = !empty($_POST['institucion']) ? intval($_POST['institucion']) : null;
+$observaciones     = $_POST['observaciones'] ?? null;
 
 /* =============================================================
-   1️⃣ CREAR RESERVA EN SUPABASE
+   3️⃣ CREAR RESERVA EN SUPABASE
    ============================================================= */
 $reservaData = [
     "id_usuario"            => $id_usuario,
@@ -71,6 +69,14 @@ $reservaData = [
 
 [$codeR, $dataR] = supabase_insert("reservas", $reservaData);
 
+// === DEBUG EXTRA ===
+// descomenta para ver la respuesta real de Supabase
+/*
+echo "<pre>";
+print_r([$codeR, $dataR]);
+exit;
+*/
+
 if ($codeR !== 201 || empty($dataR)) {
     echo "<script>
         alert('❌ Error al crear la reserva.');
@@ -82,7 +88,7 @@ if ($codeR !== 201 || empty($dataR)) {
 $id_reserva = $dataR[0]["id_reserva"];
 
 /* =============================================================
-   2️⃣ CREAR PARTICIPANTE EN SUPABASE
+   4️⃣ CREAR PARTICIPANTE EN SUPABASE
    ============================================================= */
 $participanteData = [
     "id_reserva"            => $id_reserva,
@@ -101,8 +107,15 @@ $participanteData = [
     "observaciones"         => $observaciones
 ];
 
-
 [$codeP, $dataP] = supabase_insert("participantes_reserva", $participanteData);
+
+// === DEBUG EXTRA ===
+// descomenta para ver el error real:
+/*
+echo "<pre>";
+print_r([$codeP, $dataP]);
+exit;
+*/
 
 if ($codeP !== 201) {
     echo "<script>
