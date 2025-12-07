@@ -1,7 +1,7 @@
 <?php
 session_start();
 include('../includes/verificar_sesion.php');
-include('../includes/conexion.php');
+include('../includes/header.php'); // Aquí ya tienes las funciones supabase_get()
 
 // 🛑 Verificar sesión
 if (!isset($_SESSION['usuario_id'])) {
@@ -23,11 +23,14 @@ if (!isset($_POST['id_actividad'])) {
 
 $id_actividad = intval($_POST['id_actividad']);
 
-// Obtener datos de la actividad
-$sql = "SELECT * FROM actividades WHERE id_actividad = $1 LIMIT 1";
-$resultado = pg_query_params($conn, $sql, [$id_actividad]);
+// ===================================================
+// 🔹 1. Obtener datos de la actividad desde Supabase
+// ===================================================
+$endpoint = "actividades?id_actividad=eq.$id_actividad&select=*";
 
-if (!$resultado || pg_num_rows($resultado) === 0) {
+[$code_actividad, $actividadData] = supabase_get($endpoint);
+
+if ($code_actividad !== 200 || empty($actividadData)) {
     echo "<script>
         alert('⚠️ Actividad no encontrada.');
         window.location = 'actividades.php';
@@ -35,18 +38,22 @@ if (!$resultado || pg_num_rows($resultado) === 0) {
     exit;
 }
 
-$actividad = pg_fetch_assoc($resultado);
+$actividad = $actividadData[0];
 
-// 🔽 Cargar selects desde BD
+// ===================================================
+// 🔹 2. Cargar instituciones
+// ===================================================
+[$code_inst, $instituciones] = supabase_get("instituciones?select=id_institucion,nombre_institucion&order=nombre_institucion");
 
-// Instituciones
-$instituciones = pg_query($conn, "SELECT id_institucion, nombre_institucion FROM instituciones ORDER BY nombre_institucion");
+// ===================================================
+// 🔹 3. Cargar géneros
+// ===================================================
+[$code_gen, $generos] = supabase_get("genero?select=id_genero,genero&order=genero");
 
-// Géneros
-$generos = pg_query($conn, "SELECT id_genero, genero FROM genero ORDER BY genero");
-
-// Países
-$paises = pg_query($conn, "SELECT id, pais FROM pais ORDER BY pais");
+// ===================================================
+// 🔹 4. Cargar países
+// ===================================================
+[$code_pais, $paises] = supabase_get("pais?select=id,pais&order=pais");
 
 ?>
 <!DOCTYPE html>
@@ -138,9 +145,9 @@ $paises = pg_query($conn, "SELECT id, pais FROM pais ORDER BY pais");
                     <select name="sexo" required
                             class="w-full border border-green-400 rounded-lg p-3 mt-1">
                         <option value="">Seleccionar...</option>
-                        <?php while ($g = pg_fetch_assoc($generos)): ?>
+                        <?php foreach ($generos as $g): ?>
                             <option value="<?= $g['id_genero'] ?>"><?= $g['genero'] ?></option>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </select>
                 </div>
             </div>
@@ -152,9 +159,9 @@ $paises = pg_query($conn, "SELECT id, pais FROM pais ORDER BY pais");
                     <select id="paisSelect" name="pais"
                             class="w-full border border-green-400 rounded-lg p-3 mt-1">
                         <option value="">Seleccionar país...</option>
-                        <?php while ($p = pg_fetch_assoc($paises)): ?>
+                        <?php foreach ($paises as $p): ?>
                             <option value="<?= $p['id'] ?>"><?= htmlspecialchars($p['pais']) ?></option>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -182,11 +189,11 @@ $paises = pg_query($conn, "SELECT id, pais FROM pais ORDER BY pais");
             <select name="institucion" 
                     class="w-full border border-green-400 rounded-lg p-3 mt-1">
                 <option value="">Seleccionar...</option>
-                <?php while ($i = pg_fetch_assoc($instituciones)): ?>
+                <?php foreach ($instituciones as $i): ?>
                     <option value="<?= $i['id_institucion'] ?>">
                         <?= $i['nombre_institucion'] ?>
                     </option>
-                <?php endwhile; ?>
+                <?php endforeach; ?>
             </select>
         </div>
 

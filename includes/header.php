@@ -3,23 +3,31 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Detectar ruta base
+// ==========================================
+// DETECTAR RUTA BASE
+// ==========================================
 $rutaBase = (strpos($_SERVER['PHP_SELF'], '/paginas/') !== false || strpos($_SERVER['PHP_SELF'], '/admin/') !== false)
     ? '../'
     : '';
 
-// ==========================================
-// CONFIGURACIÓN SUPABASE
-// ==========================================
-$supabase_url = getenv("DATABASE_URL");
-$supabase_key = getenv("SUPABASE_KEY");
 
-// Función GET a Supabase REST
+// ==========================================
+// CONFIGURACIÓN SUPABASE (REST API)
+// ==========================================
+// ⚠ Mantenemos tus nombres originales tal cual están funcionando
+$supabase_url = getenv("DATABASE_URL");   // URL del proyecto Supabase
+$supabase_key = getenv("SUPABASE_KEY");   // Llave pública/anon
+
+
+// ==========================================
+// FUNCIÓN GENERAL PARA CONSULTAR SUPABASE (GET)
+// ==========================================
 if (!function_exists('supabase_get')) {
     function supabase_get($endpoint) {
         global $supabase_url, $supabase_key;
 
-        $url = $supabase_url . "/rest/v1/" . $endpoint;
+        // Asegurar que no haya doble slash
+        $url = rtrim($supabase_url, "/") . "/rest/v1/" . $endpoint;
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -32,28 +40,30 @@ if (!function_exists('supabase_get')) {
 
         $response = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
         curl_close($ch);
+
         return [$code, json_decode($response, true)];
     }
 }
 
-// ===============================
-// CARGAR CANTIDAD DE NOTIFICACIONES
-// ===============================
+
+
+// ==========================================
+// NOTIFICACIONES (SI EL USUARIO ESTÁ LOGUEADO)
+// ==========================================
 $notiCount = 0;
 
 if (isset($_SESSION['usuario_id'])) {
 
     $idUsuario = intval($_SESSION['usuario_id']);
 
-    // REST: contar notificaciones NO leídas del usuario
+    // Supabase: contar notificaciones no leídas
     $endpoint = "notificaciones?select=count&id_usuario=eq.$idUsuario&leida=eq.false";
 
     [$code, $data] = supabase_get($endpoint);
 
     if ($code === 200 && !empty($data)) {
-        // Supabase devuelve [{ "count": X }]
+        // Supabase devuelve: [ { "count": X } ]
         $notiCount = $data[0]["count"] ?? 0;
     }
 }
@@ -106,6 +116,7 @@ if (isset($_SESSION['usuario_id'])) {
                         <?php if ($notiCount > 0): ?>
                             <span class="badge"><?= $notiCount ?></span>
                         <?php endif; ?>
+
                     </a>
                 </li>
             <?php endif; ?>

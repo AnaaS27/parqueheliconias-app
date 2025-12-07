@@ -1,9 +1,10 @@
 <?php
-include('../includes/conexion.php');
-
 header("Content-Type: application/json");
 
-// Validar que viene el ID del país
+// ❗ Asegurar que cargue las funciones de Supabase
+include('../includes/supabase.php');  // Asegúrate que este archivo contiene supabase_get()
+
+// Validar parámetro
 if (!isset($_GET['pais'])) {
     echo json_encode([]);
     exit;
@@ -11,15 +12,19 @@ if (!isset($_GET['pais'])) {
 
 $pais_id = intval($_GET['pais']);
 
-// Consultar ciudades según el país
-$sql = "SELECT id, nombre FROM ciudades WHERE pais_id = $1 ORDER BY nombre";
-$result = pg_query_params($conn, $sql, [$pais_id]);
+// ==============================
+// 🔹 Consulta a Supabase REST API
+// ==============================
+$endpoint = "ciudades?pais_id=eq.$pais_id&select=id,nombre&order=nombre";
 
-$ciudades = [];
+[$status, $data] = supabase_get($endpoint);
 
-while ($row = pg_fetch_assoc($result)) {
-    $ciudades[] = $row;
+// Si hay error o no devuelve datos
+if ($status !== 200 || !is_array($data)) {
+    echo json_encode([]);
+    exit;
 }
 
-// Responder a JavaScript
-echo json_encode($ciudades);
+// Respuesta correcta
+echo json_encode($data);
+

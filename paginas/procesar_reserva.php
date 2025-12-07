@@ -1,10 +1,10 @@
 <?php
 session_start();
 require '../includes/verificar_sesion.php';
-require '../includes/conexion.php';
+require '../includes/supabase.php'; // ← ahora usamos Supabase API REST
 
 // -----------------------------------------------------------
-// 🔒 Validación de sesión
+// 🔒 Validar sesión
 // -----------------------------------------------------------
 if (!isset($_SESSION['usuario_id'])) {
     echo "<script>
@@ -15,7 +15,7 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 
 // -----------------------------------------------------------
-// 📥 Validar que llegaron datos por POST
+// 📥 Validar POST
 // -----------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo "<script>
@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 // -----------------------------------------------------------
-// 🧩 Recibir datos del formulario
+// 🧩 Datos recibidos del formulario
 // -----------------------------------------------------------
 $usuario_id      = $_SESSION['usuario_id'];
 $actividad_id    = $_POST['actividad_id'] ?? null;
@@ -36,7 +36,7 @@ $numero_particip = $_POST['cantidad'] ?? 1;
 $id_institucion  = $_POST['id_institucion'] ?? null;
 
 // -----------------------------------------------------------
-// 🛑 Validación básica
+// 🛑 Validación
 // -----------------------------------------------------------
 if (!$actividad_id || !$fecha_reserva) {
     echo "<script>
@@ -46,67 +46,60 @@ if (!$actividad_id || !$fecha_reserva) {
     exit;
 }
 
-// -----------------------------------------------------------
-// 📝 INSERTAR RESERVA
-// -----------------------------------------------------------
-$sql = "
-INSERT INTO reservas 
-(id_usuario, id_actividad, id_institucion, fecha_reserva, tipo_reserva, estado, numero_participantes)
-VALUES ($1, $2, $3, $4, $5, 'pendiente', $6)
-RETURNING id_reserva
-";
+/* =============================================================
+   1️⃣ CREAR RESERVA EN SUPABASE
+   ============================================================= */
+$reservaData = [
+    "id_usuario"            => $usuario_id,
+    "id_actividad"          => $actividad_id,
+    "id_institucion"        => $id_institucion,
+    "fecha_reserva"         => $fecha_reserva,
+    "tipo_reserva"          => $tipo_reserva,
+    "estado"                => "pendiente",
+    "numero_participantes"  => $numero_particip
+];
 
-$result = pg_query_params($conn, $sql, [
-    $usuario_id,
-    $actividad_id,
-    $id_institucion,
-    $fecha_reserva,
-    $tipo_reserva,
-    $numero_particip
-]);
+[$codeR, $dataR] = supabase_insert("reservas", $reservaData);
 
-if (!$result) {
-    die("❌ Error al registrar reserva: " . pg_last_error($conn));
+if ($codeR !== 201 || empty($dataR)) {
+    echo "<script>alert('❌ Error al registrar la reserva.'); window.location='fecha_reserva.php';</script>";
+    exit;
 }
 
-$reserva = pg_fetch_assoc($result);
-$reserva_id = $reserva['id_reserva'];
+$reserva_id = $dataR[0]["id_reserva"];
 
-// -----------------------------------------------------------
-// 👤 SI ES RESERVA INDIVIDUAL → INSERTAR PARTICIPANTE
-// -----------------------------------------------------------
+/* =============================================================
+   2️⃣ INSERTAR PARTICIPANTE (INDIVIDUAL)
+   ============================================================= */
 if ($tipo_reserva === 'individual') {
 
-    $sql = "
-    INSERT INTO participantes_reserva
-    (id_reserva, id_usuario, nombre, apellido, documento, telefono, es_usuario_registrado,
-     id_genero, id_institucion, fecha_nacimiento, id_ciudad, id_interes, fecha_visita)
-    VALUES ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12)
-    ";
-
-    $params = [
-        $reserva_id,
-        $usuario_id,
-        $_SESSION['nombre'] ?? 'N/A',
-        $_SESSION['apellido'] ?? null,
-        $_SESSION['documento'] ?? null,
-        $_SESSION['telefono'] ?? null,
-        $_SESSION['id_genero'] ?? null,
-        $id_institucion,
-        $_SESSION['fecha_nacimiento'] ?? null,
-        $_SESSION['id_ciudad'] ?? null,
-        $_SESSION['id_interes'] ?? null,
-        $fecha_reserva
+    $participanteData = [
+        "id_reserva"            => $reserva_id,
+        "id_usuario"            => $usuario_id,
+        "nombre"                => $_SESSION['nombre'] ?? 'N/A',
+        "apellido"              => $_SESSION['apellido'] ?? null,
+        "documento"             => $_SESSION['documento'] ?? null,
+        "telefono"              => $_SESSION['telefono'] ?? null,
+        "es_usuario_registrado" => true,
+        "id_genero"             => $_SESSION['id_genero'] ?? null,
+        "id_institucion"        => $id_institucion,
+        "fecha_nacimiento"      => $_SESSION['fecha_nacimiento'] ?? null,
+        "id_ciudad"             => $_SESSION['id_ciudad'] ?? null,
+        "id_interes"            => $_SESSION['id_interes'] ?? null,
+        "fecha_visita"          => $fecha_reserva
     ];
 
-    if (!pg_query_params($conn, $sql, $params)) {
-        die("❌ Error al insertar participante individual: " . pg_last_error($conn));
+    [$codeP, $dataP] = supabase_insert("participantes_reserva", $participanteData);
+
+    if ($codeP !== 201) {
+        echo "<script>alert('❌ Error al registrar participante.'); window.location='fecha_reserva.php';</script>";
+        exit;
     }
 }
 
-// -----------------------------------------------------------
-// 👥 SI ES RESERVA GRUPAL → INSERTAR PARTICIPANTES
-// -----------------------------------------------------------
+/* =============================================================
+   3️⃣ INSERTAR PARTICIPANTES (GRUPAL)
+   ============================================================= */
 if ($tipo_reserva === 'grupal' && isset($_POST['integrantes'])) {
 
     foreach ($_POST['integrantes'] as $p) {
@@ -115,40 +108,38 @@ if ($tipo_reserva === 'grupal' && isset($_POST['integrantes'])) {
             continue;
         }
 
-        $sql = "
-        INSERT INTO participantes_reserva
-        (id_reserva, id_usuario, nombre, apellido, documento, telefono, es_usuario_registrado,
-         id_genero, id_institucion, fecha_nacimiento, id_ciudad, id_interes, fecha_visita)
-        VALUES ($1,$2,$3,$4,$5,$6,false,$7,$8,$9,$10,$11,$12)
-        ";
-
-        $params = [
-            $reserva_id,
-            $usuario_id,
-            $p['nombre'],
-            $p['apellido'] ?? null,
-            $p['documento'],
-            $p['telefono'] ?? null,
-            $p['id_genero'] ?? null,
-            $id_institucion,
-            $p['fecha_nacimiento'] ?? null,
-            $p['id_ciudad'] ?? null,
-            $p['id_interes'] ?? null,
-            $fecha_reserva
+        $participanteData = [
+            "id_reserva"            => $reserva_id,
+            "id_usuario"            => $usuario_id,
+            "nombre"                => $p['nombre'],
+            "apellido"              => $p['apellido'] ?? null,
+            "documento"             => $p['documento'],
+            "telefono"              => $p['telefono'] ?? null,
+            "es_usuario_registrado" => false,
+            "id_genero"             => $p['id_genero'] ?? null,
+            "id_institucion"        => $id_institucion,
+            "fecha_nacimiento"      => $p['fecha_nacimiento'] ?? null,
+            "id_ciudad"             => $p['id_ciudad'] ?? null,
+            "id_interes"            => $p['id_interes'] ?? null,
+            "fecha_visita"          => $fecha_reserva
         ];
 
-        if (!pg_query_params($conn, $sql, $params)) {
-            die("❌ Error al insertar participante grupal: " . pg_last_error($conn));
+        [$codeP, $dataP] = supabase_insert("participantes_reserva", $participanteData);
+
+        if ($codeP !== 201) {
+            echo "<script>alert('❌ Error al registrar participante grupal.'); window.location='fecha_reserva.php';</script>";
+            exit;
         }
     }
 }
 
-// -----------------------------------------------------------
-// 🎉 TODO OK
-// -----------------------------------------------------------
+/* =============================================================
+   🎉 TODO OK
+   ============================================================= */
 echo "<script>
     alert('¡Reserva registrada correctamente!');
     window.location = 'mis_reservas.php';
 </script>";
 exit;
+
 ?>

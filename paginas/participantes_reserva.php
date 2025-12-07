@@ -1,7 +1,7 @@
 <?php
 session_start();
 include('../includes/verificar_sesion.php');
-include('../includes/conexion.php');
+include('../includes/supabase.php');
 include_once('../includes/enviarCorreo.php');
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -11,26 +11,27 @@ if (!isset($_SESSION['usuario_id'])) {
 
 $id_usuario = intval($_SESSION['usuario_id']);
 
-// ------------------
-// 🔹 Obtener datos del usuario
-// ------------------
-$sql_user = "SELECT nombre, apellido, documento, correo FROM usuarios WHERE id_usuario = $1";
-$res_user = pg_query_params($conn, $sql_user, [$id_usuario]);
-$user = pg_fetch_assoc($res_user);
+/* ===========================================================
+   🔹 1. OBTENER DATOS DEL USUARIO DESDE SUPABASE
+   =========================================================== */
+$endpoint_user = "usuarios?select=nombre,apellido,documento,correo&id_usuario=eq.$id_usuario";
+[$codeU, $dataU] = supabase_get($endpoint_user);
 
-if (!$user) {
+if ($codeU !== 200 || empty($dataU)) {
     echo "<script>alert('Error obteniendo datos del usuario.'); window.location='../login.php';</script>";
     exit;
 }
 
-$nombre_usuario = $user["nombre"];
+$user = $dataU[0];
+
+$nombre_usuario  = $user["nombre"];
 $apellido_usuario = $user["apellido"];
 $doc_usuario = $user["documento"];
 $correo_usuario = $user["correo"];
 
-// ------------------
-// Validaciones básicas
-// ------------------
+/* ===========================================================
+   🔹 2. VALIDACIONES
+   =========================================================== */
 if (!isset($_GET['id_actividad']) || !isset($_GET['cantidad'])) {
     echo "<script>alert('❌ Faltan datos para realizar la reserva.'); window.location='actividades.php';</script>";
     exit;
@@ -44,36 +45,35 @@ if ($cantidad < 2) {
     exit;
 }
 
-// ------------------
-// Funciones
-// ------------------
+/* ===========================================================
+   🔹 FUNCIONES
+   =========================================================== */
 function calcularEdad($fecha_nac) {
     $hoy = new DateTime();
-    $nacimiento = new DateTime($fecha_nac);
-    return $hoy->diff($nacimiento)->y;
+    $n = new DateTime($fecha_nac);
+    return $hoy->diff($n)->y;
 }
 
-function obtenerCuposDisponibles($conn, $id_actividad, $fecha_visita) {
-    $res_act = pg_query_params($conn, "SELECT cupo_maximo FROM actividades WHERE id_actividad=$1", [$id_actividad]);
-    $row_act = pg_fetch_assoc($res_act);
-    $cupo_maximo = $row_act['cupo_maximo'] ?? 0;
+function obtenerCuposDisponibles($id_actividad, $fecha_visita) {
+    // cupo máximo
+    $endpoint_act = "actividades?select=cupo_maximo&id_actividad=eq.$id_actividad";
+    [$c1, $d1] = supabase_get($endpoint_act);
 
-    $res_cupos = pg_query_params($conn, "SELECT cupos_reservados FROM cupos_actividad WHERE id_actividad=$1 AND fecha=$2", [$id_actividad, $fecha_visita]);
-    $row_cupos = pg_fetch_assoc($res_cupos);
+    if ($c1 !== 200 || empty($d1)) return 0;
+    $cupo_maximo = $d1[0]["cupo_maximo"];
 
-    $ocupados = $row_cupos['cupos_reservados'] ?? 0;
+    // cupos ya reservados
+    $endpoint_cupos = "cupos_actividad?select=cupos_reservados&id_actividad=eq.$id_actividad&fecha=eq.$fecha_visita";
+    [$c2, $d2] = supabase_get($endpoint_cupos);
+
+    $ocupados = (!empty($d2)) ? $d2[0]["cupos_reservados"] : 0;
+
     return max($cupo_maximo - $ocupados, 0);
 }
 
-function log_error_email($texto) {
-    $logDir = __DIR__ . '/../logs';
-    if (!is_dir($logDir)) mkdir($logDir, 0755, true);
-    file_put_contents("$logDir/email_errors.log", "[".date("Y-m-d H:i:s")."] $texto\n", FILE_APPEND);
-}
-
-// ------------------
-// 🚨 Cuando envían el formulario
-// ------------------
+/* ===========================================================
+   🚨 3. SI ENVIARON EL FORMULARIO
+   =========================================================== */
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     $fecha_visita = $_POST['fecha_visita'] ?? null;
@@ -83,90 +83,133 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         exit;
     }
 
-    $cupos = obtenerCuposDisponibles($conn, $id_actividad, $fecha_visita);
+    // ✔ Validar cupos
+    $cupos = obtenerCuposDisponibles($id_actividad, $fecha_visita);
 
     if ($cupos < $cantidad) {
         echo "<script>alert('⚠️ Solo hay $cupos cupos disponibles en esa fecha.'); history.back();</script>";
         exit;
     }
 
-    // -------------------------
-    // 📝 Crear Reserva Grupal
-    // -------------------------
-    $sql_reserva = "INSERT INTO reservas (id_usuario, id_actividad, fecha_reserva, fecha_visita, estado, tipo_reserva, numero_participantes)
-                    VALUES ($1,$2,CURRENT_TIMESTAMP,$3,'pendiente','grupal',$4)
-                    RETURNING id_reserva";
+    /* ===========================================================
+       📝 4. CREAR RESERVA GRUPAL EN SUPABASE
+       =========================================================== */
+    $reservaData = [
+        "id_usuario" => $id_usuario,
+        "id_actividad" => $id_actividad,
+        "fecha_reserva" => date("Y-m-d H:i:s"),
+        "fecha_visita" => $fecha_visita,
+        "estado" => "pendiente",
+        "tipo_reserva" => "grupal",
+        "numero_participantes" => $cantidad
+    ];
 
-    $data_reserva = pg_query_params($conn, $sql_reserva, [$id_usuario, $id_actividad, $fecha_visita, $cantidad]);
-    $id_reserva = pg_fetch_assoc($data_reserva)['id_reserva'];
+    [$codeR, $dataR] = supabase_insert("reservas", $reservaData);
 
-    // -------------------------
-    // 🧍 Registrar primer participante
-    // -------------------------
+    if ($codeR !== 201) {
+        echo "<script>alert('Error creando la reserva.'); history.back();</script>";
+        exit;
+    }
+
+    $id_reserva = $dataR[0]["id_reserva"];
+
+    /* ===========================================================
+       🧍 5. REGISTRAR PARTICIPANTE PRINCIPAL
+       =========================================================== */
     $fecha_nacimiento_creador = $_POST['fecha_nacimiento_creador'];
     $edad_creador = calcularEdad($fecha_nacimiento_creador);
 
-    $sql_participante = "INSERT INTO participantes_reserva
-        (id_reserva,nombre,apellido,documento,telefono,edad,sexo,ciudad_origen,observaciones,fecha_nacimiento,es_usuario_registrado)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,1)";
+    $partPrincipal = [
+        "id_reserva" => $id_reserva,
+        "nombre" => $nombre_usuario,
+        "apellido" => $apellido_usuario,
+        "documento" => $doc_usuario,
+        "telefono" => $_POST['telefono_creador'],
+        "edad" => $edad_creador,
+        "sexo" => $_POST['sexo_creador'],
+        "ciudad_origen" => $_POST['ciudad_creador'],
+        "observaciones" => $_POST['observaciones_creador'] ?? null,
+        "fecha_nacimiento" => $fecha_nacimiento_creador,
+        "es_usuario_registrado" => true
+    ];
 
-    pg_query_params($conn, $sql_participante, [
-        $id_reserva,
-        $nombre_usuario,
-        $apellido_usuario,
-        $doc_usuario,
-        $_POST['telefono_creador'],
-        $edad_creador,
-        $_POST['sexo_creador'],
-        $_POST['ciudad_creador'],
-        $_POST['observaciones_creador'] ?? null,
-        $fecha_nacimiento_creador
-    ]);
+    supabase_insert("participantes_reserva", $partPrincipal);
 
-    // -------------------------
-    // 👥 Registrar participantes adicionales
-    // -------------------------
+    /* ===========================================================
+       👥 6. PARTICIPANTES ADICIONALES
+       =========================================================== */
     for ($i = 0; $i < $cantidad - 1; $i++) {
+
         $edad = calcularEdad($_POST['fecha_nacimiento'][$i]);
 
-        pg_query_params($conn, $sql_participante, [
-            $id_reserva,
-            $_POST['nombre'][$i],
-            $_POST['apellido'][$i],
-            $_POST['documento'][$i],
-            $_POST['telefono'][$i] ?? null,
-            $edad,
-            $_POST['sexo'][$i],
-            $_POST['ciudad_origen'][$i],
-            $_POST['observaciones'][$i] ?? null,
-            $_POST['fecha_nacimiento'][$i]
+        $p = [
+            "id_reserva" => $id_reserva,
+            "nombre" => $_POST['nombre'][$i],
+            "apellido" => $_POST['apellido'][$i],
+            "documento" => $_POST['documento'][$i],
+            "telefono" => $_POST['telefono'][$i] ?? null,
+            "edad" => $edad,
+            "sexo" => $_POST['sexo'][$i],
+            "ciudad_origen" => $_POST['ciudad_origen'][$i],
+            "observaciones" => $_POST['observaciones'][$i] ?? null,
+            "fecha_nacimiento" => $_POST['fecha_nacimiento'][$i],
+            "es_usuario_registrado" => false
+        ];
+
+        supabase_insert("participantes_reserva", $p);
+    }
+
+    /* ===========================================================
+       📌 7. ACTUALIZAR CUPOS (upsert)
+       =========================================================== */
+    $endpoint_cupos = "cupos_actividad?id_actividad=eq.$id_actividad&fecha=eq.$fecha_visita";
+
+    // Verificar si existe registro
+    [$codeC, $dataC] = supabase_get($endpoint_cupos);
+
+    if (!empty($dataC)) {
+        // actualizar
+        $nuevo = $dataC[0]["cupos_reservados"] + $cantidad;
+
+        supabase_insert("cupos_actividad", [
+            "id_actividad" => $id_actividad,
+            "fecha" => $fecha_visita,
+            "cupos_reservados" => $nuevo
+        ]);
+    } else {
+        // crear
+        supabase_insert("cupos_actividad", [
+            "id_actividad" => $id_actividad,
+            "fecha" => $fecha_visita,
+            "cupos_reservados" => $cantidad
         ]);
     }
 
-    // -------------------------
-    // 📌 Actualizar cupos
-    // -------------------------
-    $sql_cupo = "INSERT INTO cupos_actividad (id_actividad, fecha, cupos_reservados)
-                 VALUES ($1,$2,$3)
-                 ON CONFLICT (id_actividad, fecha)
-                 DO UPDATE SET cupos_reservados = cupos_actividad.cupos_reservados + EXCLUDED.cupos_reservados";
+    /* ===========================================================
+       🔔 8. NOTIFICACIONES
+       =========================================================== */
 
-    pg_query_params($conn, $sql_cupo, [$id_actividad, $fecha_visita, $cantidad]);
+    // notificación al admin
+    supabase_insert("notificaciones", [
+        "id_usuario" => 1,
+        "id_reserva" => $id_reserva,
+        "titulo" => "Nueva reserva grupal",
+        "mensaje" => "Se creó la reserva grupal #$id_reserva",
+        "tipo" => "info",
+        "fecha_creacion" => date("Y-m-d H:i:s"),
+        "leida" => false
+    ]);
 
-    // -------------------------
-    // 🔔 Crear notificaciones
-    // -------------------------
-    pg_query_params($conn,
-        "INSERT INTO notificaciones (id_usuario,id_reserva,titulo,mensaje,tipo,fecha_creacion,leida)
-         VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP,0)",
-        [1, $id_reserva, "Nueva reserva grupal", "Un usuario hizo una reserva grupal #$id_reserva", "info"]
-    );
-
-    pg_query_params($conn,
-        "INSERT INTO notificaciones (id_usuario,id_reserva,titulo,mensaje,tipo,fecha_creacion,leida)
-         VALUES ($1,$2,$3,$4,$5,CURRENT_TIMESTAMP,0)",
-        [$id_usuario, $id_reserva, "Reserva registrada", "Tu reserva grupal para $fecha_visita fue creada con éxito", "exito"]
-    );
+    // notificación al usuario
+    supabase_insert("notificaciones", [
+        "id_usuario" => $id_usuario,
+        "id_reserva" => $id_reserva,
+        "titulo" => "Reserva registrada",
+        "mensaje" => "Tu reserva grupal fue creada para el día $fecha_visita",
+        "tipo" => "exito",
+        "fecha_creacion" => date("Y-m-d H:i:s"),
+        "leida" => false
+    ]);
 
     echo "<script>alert('🎉 ¡Reserva grupal registrada correctamente!'); window.location='mis_reservas.php';</script>";
     exit;
