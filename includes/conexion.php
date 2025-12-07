@@ -35,27 +35,27 @@
 // =====================================
 
 // Variables de entorno (configuradas en Render)
-$database_url = getenv("DATABASE_URL");
+//$database_url = getenv("DATABASE_URL");
 
-if (!$database_url) {
-    die("❌ ERROR: La variable DATABASE_URL no está configurada en Render.");
-}
+//if (!$database_url) {
+ //   die("❌ ERROR: La variable DATABASE_URL no está configurada en Render.");
+//}
 
 // Parsear DATABASE_URL
-$parsed = parse_url($database_url);
+//$parsed = parse_url($database_url);
 
-$host = $parsed["host"];
-$port = $parsed["port"] ?? 5432;
-$user = $parsed["user"];
-$password = $parsed["pass"];
-$dbname = ltrim($parsed["path"], '/');
+//$host = $parsed["host"];
+//$port = $parsed["port"] ?? 5432;
+//$user = $parsed["user"];
+//$password = $parsed["pass"];
+//$dbname = ltrim($parsed["path"], '/');
 
 // Conectar usando SSL
-$conn_string = "host=$host port=$port dbname=$dbname user=$user password=$password sslmode=require";
+//$conn_string = "host=$host port=$port dbname=$dbname user=$user password=$password sslmode=require";
 
-$conn = pg_connect($conn_string);
+//$conn = pg_connect($conn_string);
 
-if (!$conn) {
-    die("❌ Error en la conexión: " . pg_last_error());
-}
-?>
+//if (!$conn) {
+//    die("❌ Error en la conexión: " . pg_last_error());
+//}
+//?>
