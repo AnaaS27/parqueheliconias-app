@@ -25,7 +25,7 @@ function supabase_get($endpoint) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "apikey: $supabase_key",
         "Authorization: Bearer $supabase_key",
-        "Content-Type: application/json"
+        "Content-Type: application/json",
         "Prefer: return=representation"
     ]);
 

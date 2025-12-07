@@ -19,7 +19,7 @@ function supabase_request($method, $endpoint, $data = null) {
     $headers = [
         "apikey: $supabase_key",
         "Authorization: Bearer $supabase_key",
-        "Content-Type: application/json"
+        "Content-Type: application/json",
         "Prefer: return=representation"
     ];
 
