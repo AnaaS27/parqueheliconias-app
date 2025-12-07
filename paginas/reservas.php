@@ -76,6 +76,9 @@ echo "<pre>";
 print_r([$codeR, $dataR]);
 exit;
 */
+echo "<pre>";
+print_r([$codeP, $dataP]);
+exit;
 
 if ($codeR !== 201 || empty($dataR)) {
     echo "<script>
