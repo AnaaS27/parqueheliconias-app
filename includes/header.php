@@ -15,25 +15,27 @@ $supabase_url = getenv("DATABASE_URL");
 $supabase_key = getenv("SUPABASE_KEY");
 
 // Función GET a Supabase REST
-function supabase_get($endpoint) {
-    global $supabase_url, $supabase_key;
+if (!function_exists('supabase_get')) {
+    function supabase_get($endpoint) {
+        global $supabase_url, $supabase_key;
 
-    $url = $supabase_url . "/rest/v1/" . $endpoint;
+        $url = $supabase_url . "/rest/v1/" . $endpoint;
 
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "apikey: $supabase_key",
-        "Authorization: Bearer $supabase_key",
-        "Content-Type: application/json",
-        "Prefer: return=representation"
-    ]);
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "apikey: $supabase_key",
+            "Authorization: Bearer $supabase_key",
+            "Content-Type: application/json",
+            "Prefer: return=representation"
+        ]);
 
-    $response = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $response = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-    curl_close($ch);
-    return [$code, json_decode($response, true)];
+        curl_close($ch);
+        return [$code, json_decode($response, true)];
+    }
 }
 
 // ===============================
