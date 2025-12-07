@@ -1,0 +1,130 @@
+/* =====================================================
+   🌿 PARTICIPANTES RESERVA - CARRUSEL HORIZONTAL
+   ===================================================== */
+
+/* Contenedor general del carrusel */
+.lista-participantes {
+  display: flex;
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-behavior: smooth;
+  gap: 25px;
+  padding: 15px;
+  width: 100%;
+  scroll-snap-type: x mandatory;
+  justify-content: flex-start;
+  align-items: stretch;
+}
+
+/* Cada tarjeta de participante */
+.participante-card {
+  flex: 0 0 85%;
+  max-width: 400px;
+  min-width: 320px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 25px;
+  border-top: 5px solid #66BB6A;
+  scroll-snap-align: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.participante-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+}
+
+/* Inputs dentro de las tarjetas */
+.participante-card .input-texto {
+  width: 100%;
+  padding: 10px;
+  margin: 8px 0 14px;
+  border: 1.5px solid #a5d6a7;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: border-color 0.3s ease;
+}
+.participante-card .input-texto:focus {
+  border-color: #be3634;
+  outline: none;
+}
+
+/* Etiquetas y textos */
+.participante-card label {
+  font-weight: 600;
+  color: #333;
+}
+
+/* --- Controles del carrusel --- */
+.controles-carrusel {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 20px;
+  gap: 15px;
+}
+
+.btn-carrusel {
+  background: #be3634;
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s ease;
+}
+.btn-carrusel:hover {
+  background: #e74c3c;
+}
+
+/* --- Indicador del carrusel --- */
+.indicador-carrusel {
+  text-align: center;
+  margin-top: 12px;
+  font-weight: 600;
+  color: #2E7D32;
+  font-size: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Puntos del carrusel */
+.indicador-carrusel .puntos {
+  display: flex;
+  gap: 6px;
+}
+.indicador-carrusel .punto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #c8e6c9;
+  transition: all 0.3s ease;
+}
+.indicador-carrusel .punto.activo {
+  background: #2E7D32;
+  transform: scale(1.3);
+}
+
+/* --- Scrollbar bonito --- */
+.lista-participantes::-webkit-scrollbar {
+  height: 10px;
+}
+.lista-participantes::-webkit-scrollbar-thumb {
+  background: #66BB6A;
+  border-radius: 6px;
+}
+.lista-participantes::-webkit-scrollbar-track {
+  background: #e8f5e9;
+  border-radius: 6px;
+}
+
+/* --- Responsivo --- */
+@media (max-width: 768px) {
+  .participante-card {
+    flex: 0 0 95%;
+  }
+}

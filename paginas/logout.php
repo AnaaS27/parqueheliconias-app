@@ -1,0 +1,30 @@
+<?php
+session_start();
+
+// Si el usuario tiene sesión activa, la destruimos
+if (isset($_SESSION['usuario_id'])) {
+    session_unset();
+    session_destroy();
+}
+?>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Cerrando sesión...</title>
+    <link rel="stylesheet" href="../assets/css/estilos.css">
+</head>
+<body class="logout-body">
+    <div class="mensaje-logout">
+        🌿 Cerrando sesión...
+    </div>
+
+    <script>
+        setTimeout(() => {
+            window.location.href = "../index.php?logout=ok";
+        }, 2500);
+    </script>
+</body>
+</html>
+
+
