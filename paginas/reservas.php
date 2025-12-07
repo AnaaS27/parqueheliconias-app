@@ -22,6 +22,23 @@ if (!isset($_POST['id_actividad'])) {
 }
 
 $id_usuario      = $_SESSION['usuario_id'];
+
+// ===============================
+// 🔍 Obtener datos del usuario
+// ===============================
+[$codeUser, $userData] = supabase_get("usuarios?id_usuario=eq.$id_usuario&select=nombre,apellido");
+
+if ($codeUser !== 200 || empty($userData)) {
+    echo "<script>
+        alert('❌ No se pudo obtener la información del usuario.');
+        window.location = 'actividades.php';
+    </script>";
+    exit;
+}
+
+$nombre   = $userData[0]["nombre"];
+$apellido = $userData[0]["apellido"];
+
 $id_actividad    = intval($_POST['id_actividad']);
 $tipo_reserva    = "individual";
 
@@ -69,12 +86,12 @@ $id_reserva = $dataR[0]["id_reserva"];
    ============================================================= */
 $participanteData = [
     "id_reserva"            => $id_reserva,
-    "id_usuario"            => null,
+    "id_usuario"            => $id_usuario,
     "nombre"                => $nombre,
     "apellido"              => $apellido,
     "documento"             => $documento,
     "telefono"              => $telefono,
-    "es_usuario_registrado" => false,
+    "es_usuario_registrado" => true,
     "fecha_registro"        => date("Y-m-d H:i:s"),
     "id_genero"             => $id_genero,
     "id_institucion"        => $institucion,
@@ -83,6 +100,7 @@ $participanteData = [
     "fecha_visita"          => $fecha_visita,
     "observaciones"         => $observaciones
 ];
+
 
 [$codeP, $dataP] = supabase_insert("participantes_reserva", $participanteData);
 

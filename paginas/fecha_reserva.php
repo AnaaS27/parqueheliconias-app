@@ -66,8 +66,6 @@ $actividad = $actividadData[0];
 
 <body class="bg-gray-100">
 
-<?php include('../includes/header.php'); ?>
-
 <main class="py-10">
 
 <section class="max-w-3xl mx-auto bg-white shadow-xl rounded-xl p-8 border-t-4 border-green-700">
