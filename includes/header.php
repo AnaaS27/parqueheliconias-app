@@ -11,7 +11,7 @@ $rutaBase = (strpos($_SERVER['PHP_SELF'], '/paginas/') !== false || strpos($_SER
 // ==========================================
 // CONFIGURACIÓN SUPABASE
 // ==========================================
-$supabase_url = getenv("SUPABASE_URL");
+$supabase_url = getenv("DATABASE_URL");
 $supabase_key = getenv("SUPABASE_KEY");
 
 // Función GET a Supabase REST

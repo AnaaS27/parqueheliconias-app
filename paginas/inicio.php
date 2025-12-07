@@ -5,7 +5,7 @@ require_once('../includes/verificar_sesion.php');
 // ===========================
 //  CONFIG DE SUPABASE
 // ===========================
-$supabase_url = getenv("SUPABASE_URL");
+$supabase_url = getenv("DATABASE_URL");
 $supabase_key = getenv("SUPABASE_KEY");
 
 // Función para hacer peticiones REST a Supabase
