@@ -1,14 +1,20 @@
 <?php
 include('../includes/header.php');
-include('../includes/conexion.php');
+
+// ======================================
+// CONSULTA A SUPABASE REST
+// ======================================
 
 // Recorridos
-$sql_recorridos = "SELECT * FROM actividades WHERE activo = true AND categoria = 'recorrido' ORDER BY id_actividad";
-$res_recorridos = pg_query($conn, $sql_recorridos);
+[$codeRec, $recorridos] = supabase_get(
+    "actividades?categoria=eq.recorrido&activo=eq.true&order=id_actividad"
+);
 
 // Talleres
-$sql_talleres = "SELECT * FROM actividades WHERE activo = true AND categoria = 'taller' ORDER BY id_actividad";
-$res_talleres = pg_query($conn, $sql_talleres);
+[$codeTall, $talleres] = supabase_get(
+    "actividades?categoria=eq.taller&activo=eq.true&order=id_actividad"
+);
+
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -45,47 +51,68 @@ body{font-family:Arial,sans-serif;background:#f8f9fa}
 
 <div class="container">
 
+<!-- ====================================== -->
+<!-- RECORRIDOS -->
+<!-- ====================================== -->
+
 <h2 class="seccion-titulo">Recorridos</h2>
 <div class="carrusel">
 <button class="flecha flecha-izq" onclick="moverCarrusel(this.parentElement,-1)">‹</button>
+
 <div class="carrusel-contenedor">
-<?php while($item = pg_fetch_assoc($res_recorridos)): ?>
-<div class="tarjeta-chicaque">
-<div class="tarjeta-superior">
-<div class="imagen-container">
-<img src="<?= $item['imagen_url'] ?>" alt="<?= htmlspecialchars($item['nombre']) ?>">
+<?php if ($codeRec === 200 && !empty($recorridos)): ?>
+    <?php foreach($recorridos as $item): ?>
+    <div class="tarjeta-chicaque">
+        <div class="tarjeta-superior">
+            <div class="imagen-container">
+                <img src="<?= $item['imagen_url'] ?>" alt="<?= htmlspecialchars($item['nombre']) ?>">
+            </div>
+            <div class="contenido">
+                <div class="globo-titulo"><?= htmlspecialchars($item['nombre']) ?></div>
+                <p class="descripcion"><?= htmlspecialchars($item['breve']) ?></p>
+                <a href="detalle_actividad.php?id=<?= $item['id_actividad'] ?>" class="btn-ver-mas">Ver más</a>
+            </div>
+        </div>
+    </div>
+    <?php endforeach; ?>
+<?php else: ?>
+    <p style="padding:30px;">No hay recorridos disponibles.</p>
+<?php endif; ?>
 </div>
-<div class="contenido">
-<div class="globo-titulo"><?= htmlspecialchars($item['nombre']) ?></div>
-<p class="descripcion"><?= htmlspecialchars($item['breve']) ?></p>
-<a href="detalle_actividad.php?id=<?= $item['id_actividad'] ?>" class="btn-ver-mas">Ver más</a>
-</div>
-</div>
-</div>
-<?php endwhile; ?>
-</div>
+
 <button class="flecha flecha-der" onclick="moverCarrusel(this.parentElement,1)">›</button>
 </div>
+
+
+<!-- ====================================== -->
+<!-- TALLERES -->
+<!-- ====================================== -->
 
 <h2 class="seccion-titulo" style="margin-top:100px">Talleres Educativos</h2>
 <div class="carrusel">
 <button class="flecha flecha-izq" onclick="moverCarrusel(this.parentElement,-1)">‹</button>
+
 <div class="carrusel-contenedor">
-<?php while($item = pg_fetch_assoc($res_talleres)): ?>
-<div class="tarjeta-chicaque">
-<div class="tarjeta-superior">
-<div class="imagen-container">
-<img src="<?= $item['imagen_url'] ?>" alt="<?= htmlspecialchars($item['nombre']) ?>">
+<?php if ($codeTall === 200 && !empty($talleres)): ?>
+    <?php foreach($talleres as $item): ?>
+    <div class="tarjeta-chicaque">
+        <div class="tarjeta-superior">
+            <div class="imagen-container">
+                <img src="<?= $item['imagen_url'] ?>" alt="<?= htmlspecialchars($item['nombre']) ?>">
+            </div>
+            <div class="contenido">
+                <div class="globo-titulo"><?= htmlspecialchars($item['nombre']) ?></div>
+                <p class="descripcion"><?= htmlspecialchars($item['breve']) ?></p>
+                <a href="detalle_actividad.php?id=<?= $item['id_actividad'] ?>" class="btn-ver-mas">Ver más</a>
+            </div>
+        </div>
+    </div>
+    <?php endforeach; ?>
+<?php else: ?>
+    <p style="padding:30px;">No hay talleres disponibles.</p>
+<?php endif; ?>
 </div>
-<div class="contenido">
-<div class="globo-titulo"><?= htmlspecialchars($item['nombre']) ?></div>
-<p class="descripcion"><?= htmlspecialchars($item['breve']) ?></p>
-<a href="detalle_actividad.php?id=<?= $item['id_actividad'] ?>" class="btn-ver-mas">Ver más</a>
-</div>
-</div>
-</div>
-<?php endwhile; ?>
-</div>
+
 <button class="flecha flecha-der" onclick="moverCarrusel(this.parentElement,1)">›</button>
 </div>
 
@@ -93,14 +120,14 @@ body{font-family:Arial,sans-serif;background:#f8f9fa}
 
 <script>
 function moverCarrusel(carrusel,direccion){
-const contenedor=carrusel.querySelector('.carrusel-contenedor');
-const ancho=carrusel.clientWidth;
-let posicion=parseInt(contenedor.dataset.pos||0)+direccion;
-const total=contenedor.children.length;
-if(posicion<0)posicion=total-1;
-if(posicion>=total)posicion=0;
-contenedor.style.transform=`translateX(${-posicion*ancho}px)`;
-contenedor.dataset.pos=posicion;
+    const contenedor=carrusel.querySelector('.carrusel-contenedor');
+    const ancho=carrusel.clientWidth;
+    let posicion=parseInt(contenedor.dataset.pos||0)+direccion;
+    const total=contenedor.children.length;
+    if(posicion<0)posicion=total-1;
+    if(posicion>=total)posicion=0;
+    contenedor.style.transform=`translateX(${-posicion*ancho}px)`;
+    contenedor.dataset.pos=posicion;
 }
 </script>
 
