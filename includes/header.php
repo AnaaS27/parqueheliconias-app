@@ -26,6 +26,7 @@ function supabase_get($endpoint) {
         "apikey: $supabase_key",
         "Authorization: Bearer $supabase_key",
         "Content-Type: application/json"
+        "Prefer: return=representation"
     ]);
 
     $response = curl_exec($ch);
