@@ -1,56 +1,101 @@
 <?php
 session_start();
-include('../includes/conexion.php');
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $correo = $_POST['correo'];
-    $contrasena = $_POST['contrasena'];
+// ===========================
+//  CONFIG DE SUPABASE
+// ===========================
+$supabase_url = getenv("SUPABASE_URL");
+$supabase_key = getenv("SUPABASE_KEY");
 
-    // Buscar usuario
-    $query = "SELECT * FROM usuarios WHERE correo = $1";
-    $result = pg_query_params($conn, $query, [$correo]);
+// Función para hacer peticiones REST a Supabase
+function supabase_request($method, $endpoint, $data = null) {
+    global $supabase_url, $supabase_key;
 
-    if (pg_num_rows($result) > 0) {
-        $usuario = pg_fetch_assoc($result);
+    $url = $supabase_url . "/rest/v1/" . $endpoint;
 
-        // Verificar contraseña con bcrypt
-        $checkQuery = "SELECT 1 FROM usuarios WHERE correo = $1 AND contrasena = crypt($2, contrasena)";
-        $verify = pg_query_params($conn, $checkQuery, [$correo, $contrasena]);
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
-        if (pg_num_rows($verify) > 0) {
+    $headers = [
+        "apikey: $supabase_key",
+        "Authorization: Bearer $supabase_key",
+        "Content-Type: application/json"
+    ];
 
-            // Guardar info en sesión
-            $_SESSION['usuario_id'] = $usuario['id_usuario'];
-            $_SESSION['rol'] = $usuario['id_rol'];
-            $_SESSION['usuario_nombre'] = $usuario['nombre'];
-            $_SESSION['usuario_apellido'] = $usuario['apellido'];
-            $_SESSION['usuario_documento'] = $usuario['documento'];
-            $_SESSION['usuario_correo'] = $usuario['correo'];
-
-            // Actualizar último login
-            pg_query_params($conn, "UPDATE usuarios SET ultimo_login = NOW() WHERE id_usuario = $1", [$usuario['id_usuario']]);
-
-            $_SESSION['toast'] = [
-                'tipo' => 'success',
-                'mensaje' => '¡Inicio de sesión exitoso! Bienvenido(a) ' . htmlspecialchars($usuario['nombre']) . ' 🌿'
-            ];
-
-            header("Location: " . ($usuario['id_rol'] == 1 ? "../admin/index.php" : "inicio.php"));
-            exit;
-        } else {
-            $_SESSION['toast'] = [
-                'tipo' => 'error',
-                'mensaje' => 'Contraseña incorrecta ❌'
-            ];
-        }
+    if ($method === "PATCH") {
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PATCH");
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array_merge($headers, ["Prefer: return=minimal"]));
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     } else {
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    }
+
+    $response = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    return [$code, json_decode($response, true)];
+}
+
+// ===========================
+//  PROCESAR LOGIN
+// ===========================
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
+    $correo = $_POST["correo"];
+    $contrasena = $_POST["contrasena"];
+
+    // 1. BUSCAR USUARIO POR CORREO
+    [$code, $resultado] = supabase_request(
+        "GET",
+        "usuarios?correo=eq." . urlencode($correo) . "&select=*"
+    );
+
+    if ($code !== 200 || empty($resultado)) {
         $_SESSION['toast'] = [
             'tipo' => 'warning',
             'mensaje' => 'No existe una cuenta con ese correo ⚠️'
         ];
+        header("Location: login.php");
+        exit;
     }
+
+    $usuario = $resultado[0];
+
+    // 2. VERIFICAR CONTRASEÑA (bcrypt)
+    if (!password_verify($contrasena, $usuario["contrasena"])) {
+        $_SESSION['toast'] = [
+            'tipo' => 'error',
+            'mensaje' => 'Contraseña incorrecta ❌'
+        ];
+        header("Location: login.php");
+        exit;
+    }
+
+    // 3. GUARDAR SESIÓN
+    $_SESSION["usuario_id"] = $usuario["id_usuario"];
+    $_SESSION["rol"] = $usuario["id_rol"];
+    $_SESSION["usuario_nombre"] = $usuario["nombre"];
+    $_SESSION["usuario_apellido"] = $usuario["apellido"];
+    $_SESSION["usuario_documento"] = $usuario["documento"];
+    $_SESSION["usuario_correo"] = $usuario["correo"];
+
+    // 4. ACTUALIZAR ULTIMO LOGIN
+    supabase_request("PATCH", "usuarios?id_usuario=eq." . $usuario["id_usuario"], [
+        "ultimo_login" => date("c")
+    ]);
+
+    // 5. REDIRECCIONAR SEGÚN ROL
+    $_SESSION['toast'] = [
+        'tipo' => 'success',
+        'mensaje' => '¡Inicio de sesión exitoso! Bienvenido(a) ' . htmlspecialchars($usuario["nombre"]) . ' 🌿'
+    ];
+
+    header("Location: " . ($usuario["id_rol"] == 1 ? "../admin/index.php" : "inicio.php"));
+    exit;
 }
 ?>
+
 
 
 <!DOCTYPE html>
