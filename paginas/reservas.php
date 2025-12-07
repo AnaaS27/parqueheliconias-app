@@ -71,14 +71,11 @@ $reservaData = [
 
 // === DEBUG EXTRA ===
 // descomenta para ver la respuesta real de Supabase
-/*
 echo "<pre>";
 print_r([$codeR, $dataR]);
 exit;
-*/
-echo "<pre>";
-print_r([$codeP, $dataP]);
-exit;
+
+
 
 if ($codeR !== 201 || empty($dataR)) {
     echo "<script>
@@ -114,11 +111,10 @@ $participanteData = [
 
 // === DEBUG EXTRA ===
 // descomenta para ver el error real:
-/*
+
 echo "<pre>";
 print_r([$codeP, $dataP]);
 exit;
-*/
 
 if ($codeP !== 201) {
     echo "<script>
