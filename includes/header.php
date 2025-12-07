@@ -3,37 +3,61 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Detectar ruta base
 $rutaBase = (strpos($_SERVER['PHP_SELF'], '/paginas/') !== false || strpos($_SERVER['PHP_SELF'], '/admin/') !== false)
     ? '../'
     : '';
 
-if (!isset($conn)) {
-    include(__DIR__ . '/../includes/conexion.php');
+// ==========================================
+// CONFIGURACIÓN SUPABASE
+// ==========================================
+$supabase_url = getenv("SUPABASE_URL");
+$supabase_key = getenv("SUPABASE_KEY");
+
+// Función GET a Supabase REST
+function supabase_get($endpoint) {
+    global $supabase_url, $supabase_key;
+
+    $url = $supabase_url . "/rest/v1/" . $endpoint;
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "apikey: $supabase_key",
+        "Authorization: Bearer $supabase_key",
+        "Content-Type: application/json"
+    ]);
+
+    $response = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    curl_close($ch);
+    return [$code, json_decode($response, true)];
 }
 
-// ---------------- Notificaciones ----------------
+// ===============================
+// CARGAR CANTIDAD DE NOTIFICACIONES
+// ===============================
 $notiCount = 0;
 
 if (isset($_SESSION['usuario_id'])) {
 
     $idUsuario = intval($_SESSION['usuario_id']);
 
-    // Consulta PostgreSQL para contar notificaciones NO leídas
-    $sql = "SELECT COUNT(*) AS total 
-            FROM notificaciones
-            WHERE id_usuario = $1
-            AND leida = FALSE";  // notificaciiones no leídas
+    // REST: contar notificaciones NO leídas del usuario
+    $endpoint = "notificaciones?select=count&id_usuario=eq.$idUsuario&leida=eq.false";
 
-    $result = pg_query_params($conn, $sql, [$idUsuario]);
+    [$code, $data] = supabase_get($endpoint);
 
-    if ($result) {
-        $row = pg_fetch_assoc($result);
-        $notiCount = $row["total"] ?? 0;
+    if ($code === 200 && !empty($data)) {
+        // Supabase devuelve [{ "count": X }]
+        $notiCount = $data[0]["count"] ?? 0;
     }
 }
+
 ?>
 
-<!-- 🔗 Enlaces CSS -->
+<!-- 🔗 CSS DEL HEADER -->
 <link rel="stylesheet" href="<?= $rutaBase ?>assets/css/header.css">
 
 <header class="user-header">
@@ -82,7 +106,6 @@ if (isset($_SESSION['usuario_id'])) {
                     </a>
                 </li>
             <?php endif; ?>
-
         </ul>
     </nav>
 

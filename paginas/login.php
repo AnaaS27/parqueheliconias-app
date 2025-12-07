@@ -1,13 +1,13 @@
 <?php
 session_start();
 
-// ===========================
+// =====================================
 //  CONFIG DE SUPABASE
-// ===========================
+// =====================================
 $supabase_url = getenv("SUPABASE_URL");
 $supabase_key = getenv("SUPABASE_KEY");
 
-// Función para hacer peticiones REST a Supabase
+// Función genérica para peticiones REST
 function supabase_request($method, $endpoint, $data = null) {
     global $supabase_url, $supabase_key;
 
@@ -37,20 +37,23 @@ function supabase_request($method, $endpoint, $data = null) {
     return [$code, json_decode($response, true)];
 }
 
-// ===========================
+// =====================================
 //  PROCESAR LOGIN
-// ===========================
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+// =====================================
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $correo = $_POST["correo"];
+    $correo = trim($_POST["correo"]);
     $contrasena = $_POST["contrasena"];
 
-    // 1. BUSCAR USUARIO POR CORREO
-    [$code, $resultado] = supabase_request(
-        "GET",
-        "usuarios?correo=eq." . urlencode($correo) . "&select=*"
-    );
+    // ---------------------------------------
+    // 1. Buscar usuario por correo
+    // ---------------------------------------
+    $endpoint = "usuarios?correo=eq." . urlencode($correo)
+              . "&select=id_usuario,nombre,apellido,documento,correo,contrasena,id_rol,usuario_activo";
 
+    [$code, $resultado] = supabase_request("GET", $endpoint);
+
+    // Si no devuelve nada → correo no existe
     if ($code !== 200 || empty($resultado)) {
         $_SESSION['toast'] = [
             'tipo' => 'warning',
@@ -62,7 +65,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     $usuario = $resultado[0];
 
-    // 2. VERIFICAR CONTRASEÑA (bcrypt)
+    // ---------------------------------------
+    // 2. Verificar si el usuario está activo
+    // ---------------------------------------
+    if (isset($usuario["usuario_activo"]) && !$usuario["usuario_activo"]) {
+        $_SESSION['toast'] = [
+            'tipo' => 'warning',
+            'mensaje' => 'Tu cuenta está inactiva. Comunícate con el administrador. ⚠️'
+        ];
+        header("Location: login.php");
+        exit;
+    }
+
+    // ---------------------------------------
+    // 3. Verificar contraseña con bcrypt
+    // ---------------------------------------
     if (!password_verify($contrasena, $usuario["contrasena"])) {
         $_SESSION['toast'] = [
             'tipo' => 'error',
@@ -72,31 +89,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         exit;
     }
 
-    // 3. GUARDAR SESIÓN
+    // ---------------------------------------
+    // 4. Guardar datos en sesión
+    // ---------------------------------------
     $_SESSION["usuario_id"] = $usuario["id_usuario"];
     $_SESSION["rol"] = $usuario["id_rol"];
     $_SESSION["usuario_nombre"] = $usuario["nombre"];
     $_SESSION["usuario_apellido"] = $usuario["apellido"];
     $_SESSION["usuario_documento"] = $usuario["documento"];
     $_SESSION["usuario_correo"] = $usuario["correo"];
+    $_SESSION["login_exitoso"] = true;
 
-    // 4. ACTUALIZAR ULTIMO LOGIN
+    // ---------------------------------------
+    // 5. Actualizar último login
+    // ---------------------------------------
     supabase_request("PATCH", "usuarios?id_usuario=eq." . $usuario["id_usuario"], [
         "ultimo_login" => date("c")
     ]);
 
-    // 5. REDIRECCIONAR SEGÚN ROL
-    $_SESSION['toast'] = [
-        'tipo' => 'success',
-        'mensaje' => '¡Inicio de sesión exitoso! Bienvenido(a) ' . htmlspecialchars($usuario["nombre"]) . ' 🌿'
-    ];
-
-    header("Location: " . ($usuario["id_rol"] == 1 ? "../admin/index.php" : "inicio.php"));
+    // ---------------------------------------
+    // 6. Redirigir según rol
+    // ---------------------------------------
+    if ($usuario["id_rol"] == 1) {
+        header("Location: ../admin/index.php");
+    } else {
+        header("Location: inicio.php");
+    }
     exit;
 }
 ?>
-
-
 
 <!DOCTYPE html>
 <html lang="es">
@@ -139,10 +160,6 @@ body.fondo-verde {
     font-weight: bold;
     border-radius: 8px;
     cursor: pointer;
-    transition: background .3s;
-}
-.contenedor-login button:hover {
-    background-color: #2d5f2e;
 }
 .toast {
     position: fixed;
@@ -159,8 +176,6 @@ body.fondo-verde {
 .toast.success { background: #3a7a3b; }
 .toast.error { background: #d43f3a; }
 .toast.warning { background: #f0ad4e; }
-@keyframes fadein { from {opacity: 0; transform: translateY(-10px);} to {opacity: 1; transform: translateY(0);} }
-@keyframes fadeout { to {opacity: 0; transform: translateY(-10px);} }
 </style>
 </head>
 <body class="fondo-verde">
@@ -170,12 +185,9 @@ body.fondo-verde {
         <?php echo htmlspecialchars($_SESSION['toast']['mensaje']); ?>
     </div>
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const toast = document.getElementById("toast");
-            if (toast) {
-                setTimeout(() => toast.classList.add("hide"), 3500);
-            }
-        });
+        setTimeout(() => {
+            document.getElementById("toast").style.display = "none";
+        }, 3500);
     </script>
     <?php unset($_SESSION['toast']); ?>
 <?php endif; ?>
@@ -183,6 +195,7 @@ body.fondo-verde {
 <div class="contenedor-login">
     <img src="../assets/img/logoo.png" class="logo" alt="Logo Parque Las Heliconias">
     <h2>Iniciar Sesión</h2>
+
     <form method="POST">
         <input type="email" name="correo" placeholder="Correo electrónico" required>
         <input type="password" name="contrasena" placeholder="Contraseña" required>
@@ -190,5 +203,6 @@ body.fondo-verde {
         <p>¿No tienes cuenta? <a href="registro.php">Regístrate aquí</a></p>
     </form>
 </div>
+
 </body>
 </html>
