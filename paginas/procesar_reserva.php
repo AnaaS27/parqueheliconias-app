@@ -35,14 +35,14 @@ $cantidad     = intval($_POST['cantidad']);
 // =============================
 // 📌 Consultar actividad en Supabase
 // =============================
-$res = supabaseFetch("actividades?id_actividad=eq.$actividad_id");
+list($codeAct, $dataAct) = supabase_get("actividades?id_actividad=eq.$actividad_id&select=*");
 
-if ($res["code"] !== 200 || empty($res["data"])) {
+if ($codeAct !== 200 || empty($dataAct)) {
     echo "<script>alert('❌ Actividad no encontrada.'); window.history.back();</script>";
     exit;
 }
 
-$actividad = $res["data"][0];
+$actividad = $dataAct[0];
 $cupos = $actividad["cupos"];
 
 // =============================
@@ -57,29 +57,31 @@ if ($cantidad > $cupos) {
 }
 
 // =============================
-// 📝 Crear reserva en Supabase (sin participantes todavía)
+// 📝 Crear reserva en Supabase
 // =============================
 $nuevaReserva = [
-    "usuario_id"     => $usuario_id,
-    "id_actividad"   => $actividad_id,
-    "fecha_reserva"  => $fecha,
-    "cantidad"       => $cantidad,
-    "fecha_creacion" => date('Y-m-d H:i:s')
+    "id_usuario"       => $usuario_id,
+    "id_actividad"     => $actividad_id,
+    "fecha_reserva"    => $fecha,
+    "numero_participantes" => $cantidad,
+    "fecha_creacion"   => date('Y-m-d H:i:s'),
+    "estado"           => "pendiente"
 ];
 
-$resReserva = supabaseFetch("reservas", "POST", $nuevaReserva);
+list($codeRes, $resData) = supabase_insert("reservas", $nuevaReserva);
 
-if ($resReserva["code"] !== 201) {
+if ($codeRes !== 201) {
     echo "<script>alert('❌ Error al registrar la reserva.'); window.history.back();</script>";
     exit;
 }
 
-$reserva_id = $resReserva["data"][0]["id"];
+$reserva_id = $resData[0]["id_reserva"];
 
 // =============================
-// 👉 Redirigir a agregar participantes
+// 💬 Redirigir a agregar participantes
 // =============================
-header("Location: agregar_participantes.php?id_reserva=$reserva_id&cantidad=$cantidad");
+
+header("Location: agregar_participantes.php?id_reserva=$reserva_id&cant=$cantidad&fecha=$fecha");
 exit;
 
 ?>
