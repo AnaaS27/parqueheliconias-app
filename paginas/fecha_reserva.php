@@ -12,13 +12,33 @@ if (!isset($_SESSION['usuario_id'])) {
     exit;
 }
 
-// Verificar actividad
-if (!isset($_GET['id_actividad'])) {
-    echo "<script>alert('Actividad no seleccionada.'); window.location='actividades.php';</script>";
+// -----------------------------------------------------
+// 🔒 Validar actividad enviada
+// -----------------------------------------------------
+if (!isset($_POST['id_actividad'])) {
+    echo "<script>
+        alert('⚠️ Actividad no seleccionada.');
+        window.location = 'actividades.php';
+    </script>";
     exit;
 }
 
-$actividad_id = intval($_GET['id_actividad']);
+$id_actividad = intval($_POST['id_actividad']);
+
+// ===============================================
+// 🔹 1. Obtener datos de la actividad desde Supabase
+// ===============================================
+[$codeAct, $actividadData] = supabase_get("actividades?id_actividad=eq.$id_actividad&select=*");
+
+if ($codeAct !== 200 || empty($actividadData)) {
+    echo "<script>
+        alert('⚠️ Actividad no encontrada.');
+        window.location = 'actividades.php';
+    </script>";
+    exit;
+}
+
+$actividad = $actividadData[0];
 
 // Cargar institución
 $instituciones = $conn->query("SELECT id_institucion, nombre FROM instituciones ORDER BY nombre_institucion ASC");
