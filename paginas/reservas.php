@@ -5,25 +5,19 @@ include('../includes/supabase.php');
 
 // 🛑 Verificar sesión
 if (!isset($_SESSION['usuario_id'])) {
-    echo "<script>
-        alert('⚠️ Debes iniciar sesión para realizar una reserva.');
-        window.location = '../login.php';
-    </script>";
+    echo "<script>alert('⚠️ Debes iniciar sesión.'); window.location='../login.php';</script>";
     exit;
 }
 
 // 🛑 Verificar datos del formulario
 if (!isset($_POST['id_actividad'])) {
-    echo "<script>
-        alert('⚠️ No se especificó la actividad.');
-        window.location = 'actividades.php';
-    </script>";
+    echo "<script>alert('⚠️ No se especificó la actividad.'); window.location='actividades.php';</script>";
     exit;
 }
 
 $id_usuario      = $_SESSION['usuario_id'];
 $id_actividad    = intval($_POST['id_actividad']);
-$tipo_reserva    = "individual";
+$tipo_reserva    = $_POST['tipo_reserva'] ?? "individual";  // ✔ tomarlo del form
 
 $fecha_visita       = $_POST['fecha_visita'];
 $tipo_documento     = $_POST['tipo_documento'];
@@ -33,11 +27,12 @@ $id_genero          = $_POST['sexo'];
 $id_ciudad          = $_POST['id_ciudad'];
 $telefono           = $_POST['telefono'];
 
-$institucion        = !empty($_POST['institucion']) ? intval($_POST['institucion']) : null;
+$institucion        = $_POST['institucion'] !== "" ? intval($_POST['institucion']) : null;
 $observaciones      = $_POST['observaciones'] ?? null;
 
-$nombre             = $_POST['nombre'] ?? "";
-$apellido           = $_POST['apellido'] ?? "";
+// TOMAR NOMBRE Y APELLIDO DEL USUARIO LOGUEADO (NO DEL FORM)
+$nombre   = $_SESSION['nombre'] ?? "Visitante";
+$apellido = $_SESSION['apellido'] ?? "";
 
 // ----------------------------------------------------------------------
 // 1️⃣ INSERTAR RESERVA (SUPABASE)
@@ -45,19 +40,22 @@ $apellido           = $_POST['apellido'] ?? "";
 $nuevaReserva = [
     "id_usuario"            => $id_usuario,
     "id_actividad"          => $id_actividad,
-    "id_institucion"        => $institucion,
-    "tipo_reserva"          => $tipo_reserva,
+    "id_institucion"        => $institucion ?: null,
+    "tipo_reserva"          => strtolower($tipo_reserva),
     "estado"                => "pendiente",
     "numero_participantes"  => 1,
-    "fecha_reserva"         => date("Y-m-d H:i:s"),
+    "fecha_reserva"         => date("c"),        // ✔ formato ISO
     "fecha_visita"          => $fecha_visita
 ];
 
 list($codeReserva, $reservaData) = supabase_insert("reservas", $nuevaReserva);
 
+// DEBUG: ver error real
+var_dump($codeReserva, $reservaData); exit;
+
 if ($codeReserva !== 201) {
     echo "<script>
-        alert('❌ Error al insertar la reserva.');
+        alert('❌ Error al insertar la reserva. SUPABASE DICE: ".json_encode($reservaData)."');
         window.location = 'actividades.php';
     </script>";
     exit;
@@ -66,17 +64,16 @@ if ($codeReserva !== 201) {
 $id_reserva = $reservaData[0]["id_reserva"];
 
 // ----------------------------------------------------------------------
-// 2️⃣ INSERTAR PARTICIPANTE INDIVIDUAL (SUPABASE)
+// 2️⃣ INSERTAR PARTICIPANTE INDIVIDUAL
 // ----------------------------------------------------------------------
-
 $participante = [
     "id_reserva"           => $id_reserva,
-    "id_usuario"           => $id_usuario,  // ✔ usuario autenticado
+    "id_usuario"           => $id_usuario,
     "nombre"               => $nombre,
     "apellido"             => $apellido,
     "documento"            => $documento,
     "telefono"             => $telefono,
-    "es_usuario_registrado"=> true,          // ✔ es usuario del sistema
+    "es_usuario_registrado"=> true,
     "id_genero"            => $id_genero,
     "id_institucion"       => $institucion,
     "fecha_nacimiento"     => $fecha_nacimiento,
@@ -86,12 +83,11 @@ $participante = [
     "observaciones"        => $observaciones
 ];
 
-
 list($codePart, $partData) = supabase_insert("participantes_reserva", $participante);
 
 if ($codePart !== 201) {
     echo "<script>
-        alert('❌ Error al registrar el participante.');
+        alert('❌ Error al registrar el participante. ".json_encode($partData)."');
         window.location = 'actividades.php';
     </script>";
     exit;
