@@ -187,3 +187,129 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 }
 
 ?>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reserva Grupal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100">
+
+<div class="max-w-4xl mx-auto mt-8 bg-white p-6 rounded-xl shadow-lg">
+
+    <h2 class="text-3xl font-bold text-green-700 text-center mb-4">
+        👨‍👩‍👧‍👦 Reserva Grupal
+    </h2>
+
+    <p class="text-center text-gray-600 mb-6">
+        Actividad ID: <?= $id_actividad ?> — Personas: <?= $cantidad ?>
+    </p>
+
+    <!-- FORMULARIO -->
+    <form action="" method="POST">
+
+        <!-- FECHA -->
+        <h3 class="text-xl font-semibold text-green-700">📅 Fecha de la visita</h3>
+        <input type="date" name="fecha_visita" required 
+               min="<?= date('Y-m-d') ?>"
+               class="border p-3 mt-2 w-full rounded-lg mb-6">
+
+        <!-- DATOS DEL CREADOR -->
+        <h3 class="text-xl font-semibold text-green-700 mb-2">👤 Datos del creador del grupo</h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label>Fecha de nacimiento:</label>
+                <input type="date" name="fecha_nacimiento_creador" required
+                       class="border p-3 w-full rounded-lg">
+            </div>
+            <div>
+                <label>Teléfono:</label>
+                <input type="text" name="telefono_creador"
+                       class="border p-3 w-full rounded-lg">
+            </div>
+            <div>
+                <label>Sexo:</label>
+                <select name="sexo_creador" class="border p-3 w-full rounded-lg">
+                    <option value="">Seleccionar...</option>
+                    <option value="M">Masculino</option>
+                    <option value="F">Femenino</option>
+                    <option value="O">Otro</option>
+                </select>
+            </div>
+            <div>
+                <label>Ciudad de origen:</label>
+                <input type="text" name="ciudad_creador"
+                       class="border p-3 w-full rounded-lg">
+            </div>
+        </div>
+
+        <textarea name="observaciones_creador"
+                  class="border p-3 w-full rounded-lg mt-4"
+                  placeholder="Observaciones del creador (opcional)"></textarea>
+
+
+        <!-- PARTICIPANTES ADICIONALES -->
+        <h3 class="text-xl font-semibold text-green-700 mt-8">👥 Participantes adicionales</h3>
+
+        <?php for ($i = 0; $i < $cantidad - 1; $i++): ?>
+            <div class="border rounded-lg p-4 mt-4 bg-gray-50">
+                <h4 class="font-semibold mb-2">Participante <?= $i + 2 ?></h4>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label>Nombre:</label>
+                        <input type="text" name="nombre[]" class="border p-3 w-full rounded-lg">
+                    </div>
+                    <div>
+                        <label>Apellido:</label>
+                        <input type="text" name="apellido[]" class="border p-3 w-full rounded-lg">
+                    </div>
+                    <div>
+                        <label>Documento:</label>
+                        <input type="text" name="documento[]" class="border p-3 w-full rounded-lg">
+                    </div>
+                    <div>
+                        <label>Teléfono:</label>
+                        <input type="text" name="telefono[]" class="border p-3 w-full rounded-lg">
+                    </div>
+                    <div>
+                        <label>Fecha de nacimiento:</label>
+                        <input type="date" name="fecha_nacimiento[]" class="border p-3 w-full rounded-lg">
+                    </div>
+                    <div>
+                        <label>Sexo:</label>
+                        <select name="sexo[]" class="border p-3 w-full rounded-lg">
+                            <option value="">Seleccionar...</option>
+                            <option value="M">Masculino</option>
+                            <option value="F">Femenino</option>
+                            <option value="O">Otro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Ciudad de origen:</label>
+                        <input type="text" name="ciudad_origen[]" class="border p-3 w-full rounded-lg">
+                    </div>
+                </div>
+
+                <textarea name="observaciones[]" placeholder="Observaciones"
+                          class="border p-3 w-full rounded-lg mt-2"></textarea>
+
+            </div>
+        <?php endfor; ?>
+
+        <button type="submit"
+                class="mt-8 bg-green-700 text-white px-6 py-3 rounded-lg w-full hover:bg-green-800">
+            ✔ Registrar reserva grupal
+        </button>
+
+    </form>
+
+</div>
+
+</body>
+</html>
+
