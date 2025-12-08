@@ -1,9 +1,8 @@
 <?php
 session_start();
 include('../includes/verificar_sesion.php');
-include('../includes/conexion.php');
 
-// Verificar parámetros necesarios
+// Validar parámetros
 if (!isset($_GET['id_reserva']) || !isset($_GET['cant']) || !isset($_GET['fecha'])) {
     echo "<script>alert('Datos incompletos.'); window.location='actividades.php';</script>";
     exit;
@@ -13,9 +12,8 @@ $id_reserva = intval($_GET['id_reserva']);
 $cant = intval($_GET['cant']);
 $fecha_visita = $_GET['fecha'];
 
-// Aseguramos mínimo 2
+// Asegurar mínimo 2 participantes en grupales
 if ($cant < 2) $cant = 2;
-
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -35,9 +33,9 @@ if ($cant < 2) $cant = 2;
     <input type="hidden" name="fecha_visita" value="<?= $fecha_visita ?>">
     <input type="hidden" name="cantidad" value="<?= $cant ?>">
 
-    <?php for ($i = 1; $i <= $cant; $i++): ?>
+    <?php for ($i = 0; $i < $cant; $i++): ?>
         <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #999;">
-            <legend><strong>Participante <?= $i ?></strong></legend>
+            <legend><strong>Participante <?= $i + 1 ?></strong></legend>
 
             <label>Nombre:</label>
             <input type="text" name="nombre[]" required><br><br>
@@ -63,11 +61,10 @@ if ($cant < 2) $cant = 2;
             </select><br><br>
 
             <label>Ciudad:</label>
-            <input type="text" name="id_ciudad[]" placeholder="ID ciudad o nombre" required><br><br>
+            <input type="text" name="id_ciudad[]" placeholder="ID ciudad" required><br><br>
 
             <label>Interés:</label>
-            <input type="text" name="id_interes[]" placeholder="ID o nombre de interés" required><br><br>
-
+            <input type="text" name="id_interes[]" placeholder="ID interés" required><br><br>
         </fieldset>
     <?php endfor; ?>
 

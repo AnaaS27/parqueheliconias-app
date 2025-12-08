@@ -20,7 +20,7 @@ $usuario_id = $_SESSION['usuario_id'];
 // 📌 Validar datos del formulario
 // =============================
 if (
-    !isset($_POST['id_actividad']) ||
+    !isset($_POST['actividad_id']) ||
     !isset($_POST['fecha']) ||
     !isset($_POST['cantidad'])
 ) {
@@ -28,14 +28,14 @@ if (
     exit;
 }
 
-$actividad_id   = intval($_POST['id_actividad']);
-$fecha          = $_POST['fecha'];
-$cantidad       = intval($_POST['cantidad']);
+$actividad_id = intval($_POST['actividad_id']);
+$fecha        = $_POST['fecha'];
+$cantidad     = intval($_POST['cantidad']);
 
 // =============================
 // 📌 Consultar actividad en Supabase
 // =============================
-$res = supabaseFetch("actividades?id=eq.$actividad_id");
+$res = supabaseFetch("actividades?id_actividad=eq.$actividad_id");
 
 if ($res["code"] !== 200 || empty($res["data"])) {
     echo "<script>alert('❌ Actividad no encontrada.'); window.history.back();</script>";
@@ -56,9 +56,8 @@ if ($cantidad > $cupos) {
     exit;
 }
 
-
 // =============================
-// 📝 Crear reserva en Supabase
+// 📝 Crear reserva en Supabase (sin participantes todavía)
 // =============================
 $nuevaReserva = [
     "usuario_id"     => $usuario_id,
@@ -78,36 +77,9 @@ if ($resReserva["code"] !== 201) {
 $reserva_id = $resReserva["data"][0]["id"];
 
 // =============================
-// 👥 Insertar participantes
+// 👉 Redirigir a agregar participantes
 // =============================
-for ($i = 0; $i < $cantidad; $i++) {
-    $nombre = $_POST["nombre_$i"] ?? "Participante $i";
-    $documento = $_POST["documento_$i"] ?? null;
-
-    $participante = [
-        "reserva_id" => $reserva_id,
-        "nombre" => $nombre,
-        "documento" => $documento
-    ];
-
-    supabaseFetch("participantes_reservas", "POST", $participante);
-}
-
-// =============================
-// ➖ Actualizar cupos restantes
-// =============================
-$nuevos_cupos = $cupos - $cantidad;
-
-supabaseFetch("actividades?id=eq.$actividad_id", "PATCH", [
-    "cupos" => $nuevos_cupos
-]);
-
-// =============================
-// 🎉 Confirmación
-// =============================
-echo "<script>
-    alert('✅ ¡Reserva realizada exitosamente!');
-    window.location = 'mis_reservas.php';
-</script>";
+header("Location: agregar_participantes.php?id_reserva=$reserva_id&cantidad=$cantidad");
+exit;
 
 ?>
