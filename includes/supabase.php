@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 /* ===========================================================
    CONFIGURACIÓN SUPABASE
    =========================================================== */
-$supabase_url = getenv("SUPABASE_URL");  
+$supabase_url = getenv("DATABASE_URL");  
 $supabase_key = getenv("SUPABASE_KEY");
 
 if (!$supabase_url || !$supabase_key) {
