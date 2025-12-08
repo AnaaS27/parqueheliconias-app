@@ -3,19 +3,16 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-/* ===========================================================
-   CONFIGURACIÓN SUPABASE
-   =========================================================== */
-$supabase_url = getenv("DATABASE_URL");  
+$supabase_url = getenv("DATABASE_URL");
 $supabase_key = getenv("SUPABASE_KEY");
 
 if (!$supabase_url || !$supabase_key) {
-    die("❌ ERROR: Las variables DATABASE_URL y SUPABASE_KEY no están configuradas.");
+    die("❌ ERROR: Variables DATABASE_URL o SUPABASE_KEY no configuradas.");
 }
 
-/* ===========================================================
-   GET (SELECT)
-   =========================================================== */
+/* ===============================
+   SELECT (GET)
+   =============================== */
 function supabase_get($endpoint) {
     global $supabase_url, $supabase_key;
 
@@ -26,7 +23,6 @@ function supabase_get($endpoint) {
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "apikey: $supabase_key",
         "Authorization: Bearer $supabase_key",
-        "Content-Type: application/json",
         "Accept: application/json"
     ]);
 
@@ -37,9 +33,9 @@ function supabase_get($endpoint) {
     return [$code, json_decode($response, true)];
 }
 
-/* ===========================================================
+/* ===============================
    INSERT (POST)
-   =========================================================== */
+   =============================== */
 function supabase_insert($table, $data) {
     global $supabase_url, $supabase_key;
 
@@ -63,13 +59,13 @@ function supabase_insert($table, $data) {
     return [$code, json_decode($response, true)];
 }
 
-/* ===========================================================
+/* ===============================
    UPDATE (PATCH)
-   =========================================================== */
-function supabase_update($table_with_query, $data) {
+   =============================== */
+function supabase_update($endpoint, $data) {
     global $supabase_url, $supabase_key;
 
-    $url = $supabase_url . "/rest/v1/" . $table_with_query;
+    $url = $supabase_url . "/rest/v1/" . $endpoint;
 
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -88,3 +84,4 @@ function supabase_update($table_with_query, $data) {
 
     return [$code, json_decode($response, true)];
 }
+?>

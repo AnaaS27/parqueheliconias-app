@@ -4,7 +4,7 @@ include('../includes/verificar_sesion.php');
 include('../includes/supabase.php');
 
 if (!isset($_POST['id_reserva'])) {
-    echo "<script>alert('Error: datos incompletos'); window.location='actividades.php';</script>";
+    echo "<script>alert('Datos incompletos'); window.location='mis_reservas.php';</script>";
     exit;
 }
 
@@ -12,7 +12,6 @@ $id_reserva = intval($_POST['id_reserva']);
 $cantidad = intval($_POST['cantidad']);
 $fecha_visita = $_POST['fecha_visita'];
 
-// Arrays enviados
 $nombres = $_POST['nombre'];
 $apellidos = $_POST['apellido'];
 $documentos = $_POST['documento'];
@@ -22,43 +21,31 @@ $generos = $_POST['id_genero'];
 $ciudades = $_POST['id_ciudad'];
 $intereses = $_POST['id_interes'];
 
-// =============================
-// 👥 Insertar participantes en Supabase
-// =============================
 for ($i = 0; $i < $cantidad; $i++) {
 
-    $participante = [
-        "id_reserva"             => $id_reserva,
-        "id_usuario"             => null,
-        "nombre"                 => $nombres[$i],
-        "apellido"               => $apellidos[$i],
-        "documento"              => $documentos[$i],
-        "telefono"               => $telefonos[$i],
-        "es_usuario_registrado"  => false,
-        "id_genero"              => $generos[$i],
-        "id_institucion"         => null,
-        "fecha_nacimiento"       => $nacimientos[$i],
-        "id_ciudad"              => $ciudades[$i],
-        "id_interes"             => $intereses[$i],
-        "fecha_visita"           => $fecha_visita
+    $data = [
+        "id_reserva"            => $id_reserva,
+        "nombre"                => $nombres[$i],
+        "apellido"              => $apellidos[$i],
+        "documento"             => $documentos[$i],
+        "telefono"              => $telefonos[$i],
+        "id_genero"             => $generos[$i],
+        "fecha_nacimiento"      => $nacimientos[$i],
+        "id_ciudad"             => $ciudades[$i],
+        "id_interes"            => $intereses[$i],
+        "fecha_visita"          => $fecha_visita,
+        "es_usuario_registrado" => false,
+        "id_usuario"            => null
     ];
 
-    $res = supabaseFetch("participantes_reserva", "POST", $participante);
+    list($code, $res) = supabase_insert("participantes_reserva", $data);
 
-    if ($res["code"] !== 201) {
-        echo "<script>alert('❌ Error al guardar participante ".($i+1)."'); window.location='mis_reservas.php';</script>";
+    if ($code !== 201) {
+        echo "<script>alert('Error guardando participante ".($i+1)."'); window.location='mis_reservas.php';</script>";
         exit;
     }
 }
 
-// =============================
-// 🎉 Finalizar
-// =============================
-echo "<script>
-    alert('Participantes registrados correctamente.');
-    window.location='mis_reservas.php';
-</script>";
+echo "<script>alert('Participantes registrados correctamente'); window.location='mis_reservas.php';</script>";
 exit;
-
 ?>
-

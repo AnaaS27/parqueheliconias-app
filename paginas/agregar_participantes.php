@@ -2,75 +2,70 @@
 session_start();
 include('../includes/verificar_sesion.php');
 
-// Validar parámetros
-if (!isset($_GET['id_reserva']) || !isset($_GET['cant']) || !isset($_GET['fecha'])) {
-    echo "<script>alert('Datos incompletos.'); window.location='actividades.php';</script>";
+$id_reserva = $_GET["id_reserva"] ?? null;
+$cant = $_GET["cant"] ?? null;
+$fecha_visita = $_GET["fecha"] ?? null;
+
+if (!$id_reserva || !$cant || !$fecha_visita) {
+    echo "<script>alert('Datos incompletos'); window.location='mis_reservas.php';</script>";
     exit;
 }
-
-$id_reserva = intval($_GET['id_reserva']);
-$cant = intval($_GET['cant']);
-$fecha_visita = $_GET['fecha'];
-
-// Asegurar mínimo 2 participantes en grupales
-if ($cant < 2) $cant = 2;
 ?>
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Agregar Participantes</title>
+<meta charset="UTF-8">
+<title>Agregar Participantes</title>
 </head>
+
 <body>
 
-<h2>Registro de Participantes del Grupo</h2>
+<h2>Registro de Participantes</h2>
 <p>Reserva #<?= $id_reserva ?></p>
-<p>Participantes requeridos: <strong><?= $cant ?></strong></p>
 
 <form action="guardar_participantes.php" method="POST">
 
-    <input type="hidden" name="id_reserva" value="<?= $id_reserva ?>">
-    <input type="hidden" name="fecha_visita" value="<?= $fecha_visita ?>">
-    <input type="hidden" name="cantidad" value="<?= $cant ?>">
+<input type="hidden" name="id_reserva" value="<?= $id_reserva ?>">
+<input type="hidden" name="cantidad" value="<?= $cant ?>">
+<input type="hidden" name="fecha_visita" value="<?= $fecha_visita ?>">
 
-    <?php for ($i = 0; $i < $cant; $i++): ?>
-        <fieldset style="margin-bottom: 15px; padding: 10px; border: 1px solid #999;">
-            <legend><strong>Participante <?= $i + 1 ?></strong></legend>
+<?php for ($i = 0; $i < $cant; $i++): ?>
+    <fieldset>
+        <legend><strong>Participante <?= $i + 1 ?></strong></legend>
 
-            <label>Nombre:</label>
-            <input type="text" name="nombre[]" required><br><br>
+        <label>Nombre:</label>
+        <input type="text" name="nombre[]" required><br>
 
-            <label>Apellido:</label>
-            <input type="text" name="apellido[]" required><br><br>
+        <label>Apellido:</label>
+        <input type="text" name="apellido[]" required><br>
 
-            <label>Documento:</label>
-            <input type="text" name="documento[]" required><br><br>
+        <label>Documento:</label>
+        <input type="text" name="documento[]" required><br>
 
-            <label>Teléfono:</label>
-            <input type="text" name="telefono[]" required><br><br>
+        <label>Teléfono:</label>
+        <input type="text" name="telefono[]" required><br>
 
-            <label>Fecha de nacimiento:</label>
-            <input type="date" name="fecha_nacimiento[]" required><br><br>
+        <label>Fecha nacimiento:</label>
+        <input type="date" name="fecha_nacimiento[]" required><br>
 
-            <label>Género:</label>
-            <select name="id_genero[]" required>
-                <option value="">Seleccione</option>
-                <option value="1">Femenino</option>
-                <option value="2">Masculino</option>
-                <option value="3">Otro</option>
-            </select><br><br>
+        <label>Género:</label>
+        <select name="id_genero[]" required>
+            <option value="">Seleccione</option>
+            <option value="1">Femenino</option>
+            <option value="2">Masculino</option>
+            <option value="3">Otro</option>
+        </select><br>
 
-            <label>Ciudad:</label>
-            <input type="text" name="id_ciudad[]" placeholder="ID ciudad" required><br><br>
+        <label>Ciudad (ID):</label>
+        <input type="text" name="id_ciudad[]" required><br>
 
-            <label>Interés:</label>
-            <input type="text" name="id_interes[]" placeholder="ID interés" required><br><br>
-        </fieldset>
-    <?php endfor; ?>
+        <label>Interés (ID):</label>
+        <input type="text" name="id_interes[]" required><br>
+    </fieldset>
+<?php endfor; ?>
 
-    <button type="submit">Guardar Participantes</button>
+<button type="submit">Guardar Participantes</button>
 
 </form>
-
 </body>
 </html>
