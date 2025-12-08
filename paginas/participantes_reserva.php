@@ -26,21 +26,25 @@ if ($codeUser !== 200 || empty($userData)) {
 
 $user = $userData[0];
 
-$nombre_usuario  = $user["nombre"];
-$apellido_usuario= $user["apellido"];
-$doc_usuario     = $user["documento"];
-$correo_usuario  = $user["correo"];
+$nombre_usuario   = $user["nombre"] ?? "";
+$apellido_usuario = $user["apellido"] ?? "";
+$doc_usuario      = $user["documento"] ?? "";
+$correo_usuario   = $user["correo"] ?? "";
 
 // ===============================
 //  VALIDACIONES BÁSICAS
 // ===============================
+
+// ⛔ CORRECCIÓN 1 → antes tenías isset() pero NO definías la variable
 if (!isset($_GET['id_actividad']) || !isset($_GET['cantidad'])) {
     echo "<script>alert('❌ Faltan datos para la reserva.'); window.location='actividades.php';</script>";
     exit;
 }
 
 $id_actividad = intval($_GET['id_actividad']);
-$cantidad     = intval($_GET['cantidad']);
+
+// ⛔ CORRECCIÓN 2 → definir $cantidad correctamente
+$cantidad = intval($_GET['cantidad']);
 
 if ($cantidad < 2) {
     echo "<script>alert('⚠️ Una reserva grupal requiere mínimo 2 participantes.'); window.location='actividades.php';</script>";
@@ -56,12 +60,6 @@ function calcularEdad($fecha) {
     return $hoy->diff($nac)->y;
 }
 
-function log_error_email($texto) {
-    $logDir = __DIR__ . '/../logs';
-    if (!is_dir($logDir)) mkdir($logDir, 0755, true);
-    file_put_contents("$logDir/email_errors.log", "[".date("Y-m-d H:i:s")."] $texto\n", FILE_APPEND);
-}
-
 // ===============================
 //  🚨 PROCESAR FORMULARIO
 // ===============================
@@ -75,7 +73,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     // ===============================
-    // 1️⃣ INSERTAR RESERVA GRUPAL
+    // 1️⃣ CREAR RESERVA GRUPAL
     // ===============================
     $nuevaReserva = [
         "id_usuario"           => $id_usuario,
@@ -100,21 +98,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     // 2️⃣ REGISTRAR PARTICIPANTE CREADOR
     // ===============================
     $fecha_nac_creador = $_POST['fecha_nacimiento_creador'];
-    $edad_creador = calcularEdad($fecha_nac_creador);
 
     $creador = [
-        "id_reserva"        => $id_reserva,
-        "nombre"            => $nombre_usuario,
-        "apellido"          => $apellido_usuario,
-        "documento"         => $doc_usuario,
-        "telefono"          => $_POST['telefono_creador'] ?? null,
-        "edad"              => $edad_creador,
-        "sexo"              => $_POST['sexo_creador'] ?? null,
-        "ciudad_origen"     => $_POST['ciudad_creador'] ?? null,
-        "observaciones"     => $_POST['observaciones_creador'] ?? null,
-        "fecha_nacimiento"  => $fecha_nac_creador,
+        "id_reserva"          => $id_reserva,
+        "nombre"              => $nombre_usuario,
+        "apellido"            => $apellido_usuario,
+        "documento"           => $doc_usuario,
+        "telefono"            => $_POST['telefono_creador'] ?? null,
+        "id_genero"           => $_POST['sexo_creador'] ?? null,
+        "id_ciudad"           => $_POST['ciudad_creador'] ?? null,
+        "fecha_nacimiento"    => $fecha_nac_creador,
         "es_usuario_registrado" => true,
-        "fecha_visita"      => $fecha_visita
+        "fecha_visita"        => $fecha_visita
     ];
 
     list($codeCreador, $resCreador) = supabase_insert("participantes_reserva", $creador);
@@ -127,12 +122,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     // ===============================
     // 3️⃣ PARTICIPANTES ADICIONALES
     // ===============================
+
     for ($i = 0; $i < $cantidad - 1; $i++) {
 
-        if (!isset($_POST['nombre'][$i]) || empty($_POST['nombre'][$i]))
-            continue;
-
-        $edad = calcularEdad($_POST['fecha_nacimiento'][$i]);
+        if (empty($_POST['nombre'][$i])) continue;
 
         $p = [
             "id_reserva"        => $id_reserva,
@@ -140,10 +133,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             "apellido"          => $_POST['apellido'][$i],
             "documento"         => $_POST['documento'][$i],
             "telefono"          => $_POST['telefono'][$i] ?? null,
-            "edad"              => $edad,
-            "sexo"              => $_POST['sexo'][$i],
-            "ciudad_origen"     => $_POST['ciudad_origen'][$i],
-            "observaciones"     => $_POST['observaciones'][$i] ?? null,
+            "id_genero"         => $_POST['sexo'][$i] ?? null,
+            "id_ciudad"         => $_POST['ciudad_origen'][$i] ?? null,
             "fecha_nacimiento"  => $_POST['fecha_nacimiento'][$i],
             "es_usuario_registrado" => false,
             "fecha_visita"      => $fecha_visita
@@ -153,39 +144,11 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     }
 
     // ===============================
-    // 4️⃣ NOTIFICACIONES
-    // ===============================
-    $notif_admin = [
-        "id_usuario"   => 1,
-        "id_reserva"   => $id_reserva,
-        "titulo"       => "Nueva reserva grupal",
-        "mensaje"      => "El usuario $nombre_usuario creó la reserva grupal #$id_reserva",
-        "tipo"         => "info",
-        "fecha_creacion" => date("Y-m-d H:i:s"),
-        "leida"        => false
-    ];
-
-    supabase_insert("notificaciones", $notif_admin);
-
-    $notif_user = [
-        "id_usuario"   => $id_usuario,
-        "id_reserva"   => $id_reserva,
-        "titulo"       => "Reserva registrada",
-        "mensaje"      => "Tu reserva grupal para la fecha $fecha_visita fue creada con éxito.",
-        "tipo"         => "exito",
-        "fecha_creacion" => date("Y-m-d H:i:s"),
-        "leida"        => false
-    ];
-
-    supabase_insert("notificaciones", $notif_user);
-
-    // ===============================
     // 🎉 TODO OK
     // ===============================
     echo "<script>alert('🎉 ¡Reserva grupal registrada correctamente!'); window.location='mis_reservas.php';</script>";
     exit;
 }
-
 ?>
 
 <!DOCTYPE html>
@@ -194,122 +157,313 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 <meta charset="UTF-8">
 <title>Reserva Grupal</title>
 <script src="https://cdn.tailwindcss.com"></script>
-</head>
 
+<style>
+/* Animación suave de transición */
+.paso {
+    display: none;
+    animation: fade 0.3s ease-in-out;
+}
+.paso.activo {
+    display: block;
+}
+
+@keyframes fade {
+  from { opacity: 0; transform: translateY(8px);}
+  to   { opacity: 1; transform: translateY(0);}
+}
+</style>
+</head>
 <body class="bg-gray-100">
 
-<div class="max-w-4xl mx-auto mt-8 bg-white p-6 rounded-xl shadow-lg">
+<?php include('../includes/header.php'); ?>
 
-    <h2 class="text-3xl font-bold text-green-700 text-center mb-4">
-        👨‍👩‍👧‍👦 Reserva Grupal
-    </h2>
-
+<div class="max-w-3xl mx-auto mt-8 bg-white p-8 shadow-xl rounded-2xl">
+    
+    <h2 class="text-3xl font-bold text-green-700 text-center mb-2">👥 Reserva Grupal</h2>
     <p class="text-center text-gray-600 mb-6">
-        Actividad ID: <?= $id_actividad ?> — Personas: <?= $cantidad ?>
+        Completa los datos para <b><?= $cantidad ?></b> participantes.
     </p>
 
+    <!-- Barra de progreso -->
+    <div class="w-full bg-gray-200 rounded-full h-3 mb-6">
+        <div id="barraProgreso"
+             class="bg-green-600 h-3 rounded-full transition-all duration-300"
+             style="width: 0%;">
+        </div>
+    </div>
+
     <!-- FORMULARIO -->
-    <form action="" method="POST">
+    <form method="POST" class="space-y-8">
 
-        <!-- FECHA -->
-        <h3 class="text-xl font-semibold text-green-700">📅 Fecha de la visita</h3>
-        <input type="date" name="fecha_visita" required 
-               min="<?= date('Y-m-d') ?>"
-               class="border p-3 mt-2 w-full rounded-lg mb-6">
+        <!-- ============================
+             1️⃣ FECHA DE VISITA
+        ============================= -->
+        <div class="paso activo" id="paso-0">
+            <h3 class="text-xl font-semibold text-green-700 mb-4">📅 Selecciona la fecha de visita</h3>
 
-        <!-- DATOS DEL CREADOR -->
-        <h3 class="text-xl font-semibold text-green-700 mb-2">👤 Datos del creador del grupo</h3>
+            <input type="date"
+                   name="fecha_visita"
+                   required
+                   min="<?= date('Y-m-d'); ?>"
+                   class="w-full p-3 border rounded-lg">
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label>Fecha de nacimiento:</label>
-                <input type="date" name="fecha_nacimiento_creador" required
-                       class="border p-3 w-full rounded-lg">
-            </div>
-            <div>
-                <label>Teléfono:</label>
-                <input type="text" name="telefono_creador"
-                       class="border p-3 w-full rounded-lg">
-            </div>
-            <div>
-                <label>Sexo:</label>
-                <select name="sexo_creador" class="border p-3 w-full rounded-lg">
-                    <option value="">Seleccionar...</option>
-                    <option value="M">Masculino</option>
-                    <option value="F">Femenino</option>
-                    <option value="O">Otro</option>
-                </select>
-            </div>
-            <div>
-                <label>Ciudad de origen:</label>
-                <input type="text" name="ciudad_creador"
-                       class="border p-3 w-full rounded-lg">
+            <div class="flex justify-end mt-6">
+                <button type="button"
+                        class="px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800"
+                        onclick="siguientePaso()">
+                    Siguiente →
+                </button>
             </div>
         </div>
 
-        <textarea name="observaciones_creador"
-                  class="border p-3 w-full rounded-lg mt-4"
-                  placeholder="Observaciones del creador (opcional)"></textarea>
+        <!-- ============================
+             2️⃣ DATOS DEL CREADOR
+        ============================= -->
+        <div class="paso" id="paso-1">
+            <h3 class="text-xl font-semibold text-green-700 mb-4">🧍 Datos del responsable del grupo</h3>
 
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-        <!-- PARTICIPANTES ADICIONALES -->
-        <h3 class="text-xl font-semibold text-green-700 mt-8">👥 Participantes adicionales</h3>
-
-        <?php for ($i = 0; $i < $cantidad - 1; $i++): ?>
-            <div class="border rounded-lg p-4 mt-4 bg-gray-50">
-                <h4 class="font-semibold mb-2">Participante <?= $i + 2 ?></h4>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label>Nombre:</label>
-                        <input type="text" name="nombre[]" class="border p-3 w-full rounded-lg">
-                    </div>
-                    <div>
-                        <label>Apellido:</label>
-                        <input type="text" name="apellido[]" class="border p-3 w-full rounded-lg">
-                    </div>
-                    <div>
-                        <label>Documento:</label>
-                        <input type="text" name="documento[]" class="border p-3 w-full rounded-lg">
-                    </div>
-                    <div>
-                        <label>Teléfono:</label>
-                        <input type="text" name="telefono[]" class="border p-3 w-full rounded-lg">
-                    </div>
-                    <div>
-                        <label>Fecha de nacimiento:</label>
-                        <input type="date" name="fecha_nacimiento[]" class="border p-3 w-full rounded-lg">
-                    </div>
-                    <div>
-                        <label>Sexo:</label>
-                        <select name="sexo[]" class="border p-3 w-full rounded-lg">
-                            <option value="">Seleccionar...</option>
-                            <option value="M">Masculino</option>
-                            <option value="F">Femenino</option>
-                            <option value="O">Otro</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label>Ciudad de origen:</label>
-                        <input type="text" name="ciudad_origen[]" class="border p-3 w-full rounded-lg">
-                    </div>
+                <div>
+                    <label class="font-semibold">Nombre</label>
+                    <input type="text" value="<?= htmlspecialchars($nombre_usuario) ?>" disabled
+                           class="w-full p-3 border rounded-lg bg-gray-100">
                 </div>
 
-                <textarea name="observaciones[]" placeholder="Observaciones"
-                          class="border p-3 w-full rounded-lg mt-2"></textarea>
+                <div>
+                    <label class="font-semibold">Apellido</label>
+                    <input type="text" value="<?= htmlspecialchars($apellido_usuario) ?>" disabled
+                           class="w-full p-3 border rounded-lg bg-gray-100">
+                </div>
+
+                <div>
+                    <label class="font-semibold">Documento</label>
+                    <input type="text" value="<?= htmlspecialchars($doc_usuario) ?>" disabled
+                           class="w-full p-3 border rounded-lg bg-gray-100">
+                </div>
+
+                <div>
+                    <label class="font-semibold">Género</label>
+                    <select name="sexo_creador" required class="w-full p-3 border rounded-lg">
+                        <option value="">Seleccionar...</option>
+                        <option value="1">Femenino</option>
+                        <option value="2">Masculino</option>
+                        <option value="3">Otro</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="font-semibold">País</label>
+                    <select id="pais_creador" class="w-full p-3 border rounded-lg">
+                        <option>Seleccionar...</option>
+                        <?php foreach ($paises as $p): ?>
+                            <option value="<?= $p['id'] ?>"><?= $p['pais'] ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="font-semibold">Ciudad</label>
+                    <select id="ciudad_creador" name="ciudad_creador"
+                            class="w-full p-3 border rounded-lg">
+                        <option value="">Seleccione país...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="font-semibold">Teléfono</label>
+                    <input type="text" name="telefono_creador"
+                           class="w-full p-3 border rounded-lg">
+                </div>
+
+                <div>
+                    <label class="font-semibold">Fecha nacimiento</label>
+                    <input type="date" name="fecha_nacimiento_creador" required
+                           class="w-full p-3 border rounded-lg">
+                </div>
 
             </div>
+
+            <div class="flex justify-between mt-6">
+                <button type="button" onclick="anteriorPaso()"
+                        class="px-6 py-3 bg-gray-300 rounded-lg">
+                    ← Atrás
+                </button>
+                <button type="button" onclick="siguientePaso()"
+                        class="px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800">
+                    Siguiente →
+                </button>
+            </div>
+        </div>
+
+        <!-- ================================
+            3️⃣ PARTICIPANTES ADICIONALES
+        ================================ -->
+
+        <?php for ($i = 1; $i < $cantidad; $i++): ?>
+        <div class="paso" id="paso-<?= $i + 1 ?>">
+
+            <h3 class="text-xl font-semibold text-green-700 mb-4">
+                👤 Participante <?= $i + 1 ?> de <?= $cantidad ?>
+            </h3>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                <div>
+                    <label class="font-semibold">Nombre</label>
+                    <input type="text" name="nombre[]" required
+                           class="w-full p-3 border rounded-lg">
+                </div>
+
+                <div>
+                    <label class="font-semibold">Apellido</label>
+                    <input type="text" name="apellido[]" required
+                           class="w-full p-3 border rounded-lg">
+                </div>
+
+                <div>
+                    <label class="font-semibold">Documento</label>
+                    <input type="text" name="documento[]" required
+                           class="w-full p-3 border rounded-lg">
+                </div>
+
+                <div>
+                    <label class="font-semibold">Género</label>
+                    <select name="sexo[]" required class="w-full p-3 border rounded-lg">
+                        <option value="">Seleccionar...</option>
+                        <option value="1">Femenino</option>
+                        <option value="2">Masculino</option>
+                        <option value="3">Otro</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="font-semibold">País</label>
+                    <select class="pais w-full p-3 border rounded-lg">
+                        <option value="">Seleccionar...</option>
+                        <?php foreach ($paises as $p): ?>
+                            <option value="<?= $p['id'] ?>"><?= $p['pais'] ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="font-semibold">Ciudad</label>
+                    <select name="ciudad_origen[]" class="ciudad w-full p-3 border rounded-lg">
+                        <option>Seleccione país…</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="font-semibold">Teléfono</label>
+                    <input type="text" name="telefono[]" class="w-full p-3 border rounded-lg">
+                </div>
+
+                <div>
+                    <label class="font-semibold">Fecha nacimiento</label>
+                    <input type="date" name="fecha_nacimiento[]" required
+                           class="w-full p-3 border rounded-lg">
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="font-semibold">Observaciones</label>
+                    <textarea name="observaciones[]" rows="2"
+                              class="w-full p-3 border rounded-lg"></textarea>
+                </div>
+
+            </div>
+
+            <div class="flex justify-between mt-6">
+                <button type="button" onclick="anteriorPaso()"
+                        class="px-6 py-3 bg-gray-300 rounded-lg">
+                    ← Atrás
+                </button>
+
+                <?php if ($i == $cantidad - 1): ?>
+                    <!-- Último paso -->
+                    <button type="submit"
+                            class="px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800">
+                        ✔ Confirmar Reserva
+                    </button>
+                <?php else: ?>
+                    <button type="button" onclick="siguientePaso()"
+                            class="px-6 py-3 bg-green-700 text-white rounded-lg hover:bg-green-800">
+                        Siguiente →
+                    </button>
+                <?php endif; ?>
+            </div>
+
+        </div>
         <?php endfor; ?>
 
-        <button type="submit"
-                class="mt-8 bg-green-700 text-white px-6 py-3 rounded-lg w-full hover:bg-green-800">
-            ✔ Registrar reserva grupal
-        </button>
-
     </form>
-
 </div>
+
+
+<script>
+let pasoActual = 0;
+const pasos = document.querySelectorAll(".paso");
+const barra = document.getElementById("barraProgreso");
+
+function actualizarProgressBar() {
+    const porcentaje = (pasoActual / (pasos.length - 1)) * 100;
+    barra.style.width = porcentaje + "%";
+}
+
+function mostrarPaso(i) {
+    pasos.forEach(p => p.classList.remove("activo"));
+    pasos[i].classList.add("activo");
+    pasoActual = i;
+    actualizarProgressBar();
+}
+
+function siguientePaso() {
+    if (pasoActual < pasos.length - 1) {
+        mostrarPaso(pasoActual + 1);
+    }
+}
+
+function anteriorPaso() {
+    if (pasoActual > 0) {
+        mostrarPaso(pasoActual - 1);
+    }
+}
+
+mostrarPaso(0);
+
+// AJAX País → Ciudades
+document.addEventListener("change", e => {
+    if (e.target.classList.contains("pais")) {
+        const paisID = e.target.value;
+        const ciudadSelect = e.target.closest("div").nextElementSibling.querySelector(".ciudad");
+        ciudadSelect.innerHTML = "<option>Cargando...</option>";
+
+        fetch("ajax_ciudades.php?pais=" + paisID)
+            .then(r => r.json())
+            .then(ciudades => {
+                ciudadSelect.innerHTML = "";
+                ciudades.forEach(c => {
+                    ciudadSelect.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
+                });
+            });
+    }
+});
+
+// CREATOR: País → Ciudad
+document.getElementById("pais_creador").addEventListener("change", function () {
+    const pais = this.value;
+    const ciudadSel = document.getElementById("ciudad_creador");
+    ciudadSel.innerHTML = "<option>Cargando...</option>";
+
+    fetch("ajax_ciudades.php?pais=" + pais)
+        .then(r => r.json())
+        .then(data => {
+            ciudadSel.innerHTML = "";
+            data.forEach(c => ciudadSel.innerHTML += `<option value="${c.id}">${c.nombre}</option>`);
+        });
+});
+</script>
 
 </body>
 </html>
-
