@@ -33,7 +33,7 @@ $fecha        = $_POST['fecha'];
 $cantidad     = intval($_POST['cantidad']);
 
 // =============================
-// 📌 Consultar actividad en Supabase
+// 📌 Consultar actividad en Supabase (solo para verificar que exista)
 // =============================
 list($codeAct, $dataAct) = supabase_get("actividades?id_actividad=eq.$actividad_id&select=*");
 
@@ -42,30 +42,16 @@ if ($codeAct !== 200 || empty($dataAct)) {
     exit;
 }
 
-$actividad = $dataAct[0];
-$cupos = $actividad["cupos"];
-
-// =============================
-// 🚨 Validar disponibilidad
-// =============================
-if ($cantidad > $cupos) {
-    echo "<script>
-        alert('❌ No hay suficientes cupos disponibles. Cupos actuales: $cupos');
-        window.history.back();
-    </script>";
-    exit;
-}
-
 // =============================
 // 📝 Crear reserva en Supabase
 // =============================
 $nuevaReserva = [
-    "id_usuario"       => $usuario_id,
-    "id_actividad"     => $actividad_id,
-    "fecha_reserva"    => $fecha,
-    "numero_participantes" => $cantidad,
-    "fecha_creacion"   => date('Y-m-d H:i:s'),
-    "estado"           => "pendiente"
+    "id_usuario"            => $usuario_id,
+    "id_actividad"          => $actividad_id,
+    "fecha_reserva"         => $fecha,
+    "numero_participantes"  => $cantidad,
+    "fecha_creacion"        => date('Y-m-d H:i:s'),
+    "estado"                => "pendiente"
 ];
 
 list($codeRes, $resData) = supabase_insert("reservas", $nuevaReserva);
@@ -80,7 +66,6 @@ $reserva_id = $resData[0]["id_reserva"];
 // =============================
 // 💬 Redirigir a agregar participantes
 // =============================
-
 header("Location: agregar_participantes.php?id_reserva=$reserva_id&cant=$cantidad&fecha=$fecha");
 exit;
 
