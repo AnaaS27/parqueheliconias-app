@@ -1,30 +1,27 @@
 <?php
 header("Content-Type: application/json");
-
-// ❗ Asegurar que cargue las funciones de Supabase
-include('../includes/supabase.php');  // Asegúrate que este archivo contiene supabase_get()
+include('../includes/supabase.php');
 
 // Validar parámetro
-if (!isset($_GET['pais'])) {
+if (!isset($_GET['pais']) || empty($_GET['pais'])) {
     echo json_encode([]);
     exit;
 }
 
 $pais_id = intval($_GET['pais']);
 
-// ==============================
-// 🔹 Consulta a Supabase REST API
-// ==============================
-$endpoint = "ciudades?pais_id=eq.$pais_id&select=id,nombre&order=nombre";
+// ==========================================
+// 🔎 CONSULTAR CIUDADES EN SUPABASE
+// ==========================================
+list($code, $ciudades) = supabase_get("ciudades?pais_id=eq.$pais_id&select=id,nombre&order=nombre.asc");
 
-[$status, $data] = supabase_get($endpoint);
-
-// Si hay error o no devuelve datos
-if ($status !== 200 || !is_array($data)) {
+// Si la consulta falla, enviamos una lista vacía
+if ($code !== 200 || !is_array($ciudades)) {
     echo json_encode([]);
     exit;
 }
 
-// Respuesta correcta
-echo json_encode($data);
-
+// Responder JSON
+echo json_encode($ciudades);
+exit;
+?>
