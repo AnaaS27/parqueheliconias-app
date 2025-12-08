@@ -3,7 +3,9 @@ session_start();
 include('../includes/verificar_sesion.php');
 include('../includes/supabase.php');
 
-// Verificar sesión
+// -----------------------------------------------------
+// 🔒 Verificar sesión
+// -----------------------------------------------------
 if (!isset($_SESSION['usuario_id'])) {
     echo "<script>
         alert('⚠️ Debes iniciar sesión para realizar una reserva.');
@@ -13,9 +15,12 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 
 // -----------------------------------------------------
-// 🔒 Validar actividad enviada
+// 🔒 Validar que llegue actividad_id por GET
 // -----------------------------------------------------
-if (!isset($_POST['id_actividad'])) {
+$actividad_id = $_GET['actividad_id'] ?? null;
+$tipo = $_GET['tipo'] ?? 'individual';
+
+if (!$actividad_id) {
     echo "<script>
         alert('⚠️ Actividad no seleccionada.');
         window.location = 'actividades.php';
@@ -23,12 +28,10 @@ if (!isset($_POST['id_actividad'])) {
     exit;
 }
 
-$id_actividad = intval($_POST['id_actividad']);
-
-// ===============================================
-// 🔹 1. Obtener datos de la actividad desde Supabase
-// ===============================================
-[$codeAct, $actividadData] = supabase_get("actividades?id_actividad=eq.$id_actividad&select=*");
+// -----------------------------------------------------
+// 🔎 1. Obtener actividad desde Supabase
+// -----------------------------------------------------
+[$codeAct, $actividadData] = supabase_get("actividades?id_actividad=eq.$actividad_id&select=*");
 
 if ($codeAct !== 200 || empty($actividadData)) {
     echo "<script>
@@ -40,11 +43,11 @@ if ($codeAct !== 200 || empty($actividadData)) {
 
 $actividad = $actividadData[0];
 
-// Cargar institución
-$instituciones = $conn->query("SELECT id_institucion, nombre FROM instituciones ORDER BY nombre_institucion ASC");
+// -----------------------------------------------------
+// 🔎 2. Traer instituciones desde Supabase
+// -----------------------------------------------------
+[$codeInst, $instData] = supabase_get("instituciones?select=id_institucion,nombre_institucion&order=nombre_institucion.asc");
 
-// Tipo de reserva
-$tipo = isset($_GET['tipo']) ? $_GET['tipo'] : 'individual';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -54,39 +57,50 @@ $tipo = isset($_GET['tipo']) ? $_GET['tipo'] : 'individual';
 </head>
 <body>
 
-<h2>Reservar actividad</h2>
+<h2>Reservar: <?= htmlspecialchars($actividad['nombre']) ?></h2>
 
 <form action="procesar_reserva.php" method="POST">
 
+    <!-- Mandar datos -->
     <input type="hidden" name="actividad_id" value="<?= $actividad_id ?>">
     <input type="hidden" name="tipo_reserva" value="<?= $tipo ?>">
 
     <!-- Fecha -->
-    <label>Fecha de visita:</label>
-    <input type="date" name="fecha_visita" required><br><br>
+    <label>📅 Fecha de visita:</label>
+    <input type="date" name="fecha_visita" required min="<?= date("Y-m-d") ?>">
+    <br><br>
 
     <!-- Institución -->
-    <label>Institución:</label>
+    <label>🏫 Institución:</label>
     <select name="id_institucion" required>
         <option value="">Seleccione</option>
-        <?php while ($row = $instituciones->fetch_assoc()): ?>
-            <option value="<?= $row['id_institucion'] ?>"><?= $row['nombre'] ?></option>
-        <?php endwhile; ?>
-    </select><br><br>
 
-    <?php if ($tipo == 'grupal'): ?>
+        <?php if ($codeInst === 200 && !empty($instData)): ?>
+            <?php foreach ($instData as $inst): ?>
+                <option value="<?= $inst['id_institucion'] ?>">
+                    <?= htmlspecialchars($inst['nombre_institucion']) ?>
+                </option>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <option disabled>No hay instituciones registradas</option>
+        <?php endif; ?>
+
+    </select>
+    <br><br>
+
+    <?php if ($tipo === 'grupal'): ?>
 
         <!-- Nombre del grupo -->
-        <label>Nombre del grupo:</label>
+        <label>👥 Nombre del grupo:</label>
         <input type="text" name="nombre_grupo" required><br><br>
 
         <!-- Número de participantes -->
-        <label>Número de participantes:</label>
+        <label>👤 Número de participantes:</label>
         <input type="number" name="numero_participantes" min="2" required><br><br>
 
     <?php endif; ?>
 
-    <button type="submit">Continuar</button>
+    <button type="submit">Continuar →</button>
 
 </form>
 
