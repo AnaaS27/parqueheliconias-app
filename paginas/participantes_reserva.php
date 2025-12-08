@@ -34,7 +34,6 @@ $correo_usuario   = $user["correo"] ?? "";
 // ===============================
 //  VALIDACIONES BÁSICAS
 // ===============================
-
 if (!isset($_GET['id_actividad']) || !isset($_GET['cantidad'])) {
     echo "<script>alert('❌ Faltan datos para la reserva.'); window.location='actividades.php';</script>";
     exit;
@@ -51,27 +50,14 @@ if ($cantidad < 2) {
 // ===============================
 //  🔎 CONSULTAR LISTAS DESDE SUPABASE
 // ===============================
-
-// Países
 list($codePais, $paises) = supabase_get("pais?select=id,pais&order=pais.asc");
 if ($codePais !== 200) $paises = [];
 
-// Géneros
 list($codeGen, $generos) = supabase_get("genero?select=id_genero,genero&order=genero.asc");
 if ($codeGen !== 200) $generos = [];
 
-// Instituciones
 list($codeInst, $instituciones) = supabase_get("instituciones?select=id_institucion,nombre_institucion&order=nombre_institucion.asc");
 if ($codeInst !== 200) $instituciones = [];
-
-// ===============================
-//  FUNCIONES AUXILIARES
-// ===============================
-function calcularEdad($fecha) {
-    $hoy = new DateTime();
-    $nac = new DateTime($fecha);
-    return $hoy->diff($nac)->y;
-}
 
 // ===============================
 //  🚨 PROCESAR FORMULARIO
@@ -135,12 +121,13 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     // ===============================
     // 3️⃣ PARTICIPANTES ADICIONALES
     // ===============================
+    $listaParticipantes = [];
 
     for ($i = 0; $i < $cantidad - 1; $i++) {
 
         if (empty($_POST['nombre'][$i])) continue;
 
-        $p = [
+        $participante = [
             "id_reserva"        => $id_reserva,
             "nombre"            => $_POST['nombre'][$i],
             "apellido"          => $_POST['apellido'][$i],
@@ -153,15 +140,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             "fecha_visita"      => $fecha_visita
         ];
 
-        supabase_insert("participantes_reserva", $p);
+        supabase_insert("participantes_reserva", $participante);
+
+        // Para el correo:
+        $listaParticipantes[] = [
+            "nombre"   => $_POST['nombre'][$i],
+            "apellido" => $_POST['apellido'][$i],
+            "documento"=> $_POST['documento'][$i],
+            "genero"   => $_POST['sexo'][$i],
+            "ciudad"   => $_POST['ciudad_origen'][$i]
+        ];
     }
 
-    // ==========================================================
-    // 4️⃣ CREAR NOTIFICACIONES INTERNAS
-    // ==========================================================
-
-    // 🔹 Notificación para administrador (ID=1)
-    $notif_admin = [
+    // ===========================================
+    // 4️⃣ NOTIFICACIONES INTERNAS
+    // ===========================================
+    // Notificación para admin (ID=1)
+    supabase_insert("notificaciones", [
         "id_usuario"      => 1,
         "id_reserva"      => $id_reserva,
         "titulo"          => "Nueva reserva grupal",
@@ -169,11 +164,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         "tipo"            => "info",
         "fecha_creacion"  => date("Y-m-d H:i:s"),
         "leida"           => false
-    ];
-    supabase_insert("notificaciones", $notif_admin);
+    ]);
 
-    // 🔹 Notificación para el usuario
-    $notif_user = [
+    // Notificación para el usuario
+    supabase_insert("notificaciones", [
         "id_usuario"      => $id_usuario,
         "id_reserva"      => $id_reserva,
         "titulo"          => "Reserva registrada",
@@ -181,29 +175,39 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         "tipo"            => "exito",
         "fecha_creacion"  => date("Y-m-d H:i:s"),
         "leida"           => false
-    ];
-    supabase_insert("notificaciones", $notif_user);
+    ]);
 
-    // ==========================================================
-    // 5️⃣ ENVIAR CORREO DE CONFIRMACIÓN
-    // ==========================================================
+    // ===========================================
+    // 5️⃣ ENVIAR CORREO DETALLADO
+    // ===========================================
 
-    // ✔ Obtener nombre de la actividad
+    // Obtener nombre de actividad
     list($codeAct, $actData) = supabase_get("actividades?id_actividad=eq.$id_actividad&select=nombre");
-    $actividadNombre = ($codeAct === 200 && !empty($actData)) ? $actData[0]["nombre"] : "Actividad";
+    $actividadNombre = $actData[0]["nombre"] ?? "Actividad";
 
-    // ✔ Enviar correo al usuario
-    enviarCorreoReserva(
+    // Datos del responsable para el correo
+    $responsableInfo = [
+        "nombre"   => $nombre_usuario,
+        "apellido" => $apellido_usuario,
+        "documento"=> $doc_usuario,
+        "telefono" => $_POST['telefono_creador'] ?? "",
+        "ciudad"   => $_POST['ciudad_creador'] ?? ""
+    ];
+
+    enviarCorreoReservaGrupal(
         $correo_usuario,
         $nombre_usuario,
         $id_reserva,
         $fecha_visita,
-        $actividadNombre
+        $actividadNombre,
+        $cantidad,
+        $responsableInfo,
+        $listaParticipantes
     );
 
-    // ==========================================================
-    // 🎉 6️⃣ MENSAJE FINAL
-    // ==========================================================
+    // ===========================================
+    // 🎉 6️⃣ FIN
+    // ===========================================
     echo "<script>alert('🎉 ¡Reserva grupal registrada correctamente! Se envió confirmación al correo.'); window.location='mis_reservas.php';</script>";
     exit;
 }
