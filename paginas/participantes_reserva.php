@@ -52,6 +52,23 @@ if ($cantidad < 2) {
 }
 
 // ===============================
+//  🔎 CONSULTAR LISTAS DESDE SUPABASE
+// ===============================
+
+// Países
+list($codePais, $paises) = supabase_get("pais?select=id,pais&order=pais.asc");
+if ($codePais !== 200) $paises = [];
+
+// Géneros
+list($codeGen, $generos) = supabase_get("genero?select=id_genero,genero&order=genero.asc");
+if ($codeGen !== 200) $generos = [];
+
+// Instituciones
+list($codeInst, $instituciones) = supabase_get("instituciones?select=id_institucion,nombre_institucion&order=nombre_institucion.asc");
+if ($codeInst !== 200) $instituciones = [];
+
+
+// ===============================
 //  FUNCIONES AUXILIARES
 // ===============================
 function calcularEdad($fecha) {
