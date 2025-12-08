@@ -35,16 +35,13 @@ $correo_usuario   = $user["correo"] ?? "";
 //  VALIDACIONES BÁSICAS
 // ===============================
 
-// ⛔ CORRECCIÓN 1 → antes tenías isset() pero NO definías la variable
 if (!isset($_GET['id_actividad']) || !isset($_GET['cantidad'])) {
     echo "<script>alert('❌ Faltan datos para la reserva.'); window.location='actividades.php';</script>";
     exit;
 }
 
 $id_actividad = intval($_GET['id_actividad']);
-
-// ⛔ CORRECCIÓN 2 → definir $cantidad correctamente
-$cantidad = intval($_GET['cantidad']);
+$cantidad     = intval($_GET['cantidad']);
 
 if ($cantidad < 2) {
     echo "<script>alert('⚠️ Una reserva grupal requiere mínimo 2 participantes.'); window.location='actividades.php';</script>";
@@ -66,7 +63,6 @@ if ($codeGen !== 200) $generos = [];
 // Instituciones
 list($codeInst, $instituciones) = supabase_get("instituciones?select=id_institucion,nombre_institucion&order=nombre_institucion.asc");
 if ($codeInst !== 200) $instituciones = [];
-
 
 // ===============================
 //  FUNCIONES AUXILIARES
@@ -160,10 +156,55 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         supabase_insert("participantes_reserva", $p);
     }
 
-    // ===============================
-    // 🎉 TODO OK
-    // ===============================
-    echo "<script>alert('🎉 ¡Reserva grupal registrada correctamente!'); window.location='mis_reservas.php';</script>";
+    // ==========================================================
+    // 4️⃣ CREAR NOTIFICACIONES INTERNAS
+    // ==========================================================
+
+    // 🔹 Notificación para administrador (ID=1)
+    $notif_admin = [
+        "id_usuario"      => 1,
+        "id_reserva"      => $id_reserva,
+        "titulo"          => "Nueva reserva grupal",
+        "mensaje"         => "El usuario $nombre_usuario ha creado la reserva grupal #$id_reserva",
+        "tipo"            => "info",
+        "fecha_creacion"  => date("Y-m-d H:i:s"),
+        "leida"           => false
+    ];
+    supabase_insert("notificaciones", $notif_admin);
+
+    // 🔹 Notificación para el usuario
+    $notif_user = [
+        "id_usuario"      => $id_usuario,
+        "id_reserva"      => $id_reserva,
+        "titulo"          => "Reserva registrada",
+        "mensaje"         => "Tu reserva grupal para la fecha $fecha_visita fue creada con éxito.",
+        "tipo"            => "exito",
+        "fecha_creacion"  => date("Y-m-d H:i:s"),
+        "leida"           => false
+    ];
+    supabase_insert("notificaciones", $notif_user);
+
+    // ==========================================================
+    // 5️⃣ ENVIAR CORREO DE CONFIRMACIÓN
+    // ==========================================================
+
+    // ✔ Obtener nombre de la actividad
+    list($codeAct, $actData) = supabase_get("actividades?id_actividad=eq.$id_actividad&select=nombre");
+    $actividadNombre = ($codeAct === 200 && !empty($actData)) ? $actData[0]["nombre"] : "Actividad";
+
+    // ✔ Enviar correo al usuario
+    enviarCorreoReserva(
+        $correo_usuario,
+        $nombre_usuario,
+        $id_reserva,
+        $fecha_visita,
+        $actividadNombre
+    );
+
+    // ==========================================================
+    // 🎉 6️⃣ MENSAJE FINAL
+    // ==========================================================
+    echo "<script>alert('🎉 ¡Reserva grupal registrada correctamente! Se envió confirmación al correo.'); window.location='mis_reservas.php';</script>";
     exit;
 }
 ?>
