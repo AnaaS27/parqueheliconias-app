@@ -5,49 +5,83 @@ if (!isset($_SESSION['usuario_id'])) {
     exit();
 }
 
-include(__DIR__ . '/../includes/conexion.php');
+include('../includes/verificar_sesion.php');
+include('../includes/supabase.php');
+
 $id_usuario = intval($_SESSION['usuario_id']);
 
-// ------------------------------
+
+// ======================================================
 // 🗑 ELIMINAR UNA NOTIFICACIÓN
-// ------------------------------
-if (isset($_GET['borrar'])) {
-    pg_query_params($conn, "DELETE FROM notificaciones WHERE id_notificacion = $1 AND id_usuario = $2", [intval($_GET['borrar']), $id_usuario]);
+// ======================================================
+if (isset($_GET["borrar"])) {
+    $id_notificacion = intval($_GET["borrar"]);
+    $endpoint = "notificaciones?id_notificacion=eq.$id_notificacion&id_usuario=eq.$id_usuario";
+
+    list($codeDel, $respDel) = supabase_update($endpoint, ["deleted" => true]);
+
+    // Como no manejas borrado lógico, usamos DELETE real:
+    if ($codeDel !== 200) {
+        // enforce delete using RPC alternative:
+        $ch = curl_init($supabase_url . "/rest/v1/notificaciones?id_notificacion=eq.$id_notificacion&id_usuario=eq.$id_usuario");
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "apikey: $supabase_key",
+            "Authorization: Bearer $supabase_key"
+        ]);
+        curl_exec($ch);
+        curl_close($ch);
+    }
+
     header("Location: notificaciones.php");
     exit;
 }
 
-// ------------------------------
-// 🗑 ELIMINAR TODAS
-// ------------------------------
-if (isset($_GET['borrar_todas'])) {
-    pg_query_params($conn, "DELETE FROM notificaciones WHERE id_usuario = $1", [$id_usuario]);
+
+// ======================================================
+// 🗑 ELIMINAR TODAS LAS NOTIFICACIONES
+// ======================================================
+if (isset($_GET["borrar_todas"])) {
+    $url = $supabase_url . "/rest/v1/notificaciones?id_usuario=eq.$id_usuario";
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "DELETE");
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "apikey: $supabase_key",
+        "Authorization: Bearer $supabase_key"
+    ]);
+    curl_exec($ch);
+    curl_close($ch);
+
     header("Location: notificaciones.php");
     exit;
 }
 
-// ------------------------------
-// 📌 CONSULTA AGRUPADA POR FECHA
-// ------------------------------
-$sql = "
-    SELECT 
-        DATE(fecha_creacion) AS fecha,
-        STRING_AGG(id_notificacion::text, ',') AS ids,
-        STRING_AGG(titulo, '||') AS titulos,
-        STRING_AGG(mensaje, '||') AS mensajes,
-        STRING_AGG(tipo, '||') AS tipos
-    FROM notificaciones
-    WHERE id_usuario = $1
-    GROUP BY DATE(fecha_creacion)
-    ORDER BY fecha DESC
-";
-$result = pg_query_params($conn, $sql, [$id_usuario]);
 
-// ------------------------------
-// 🔔 MARCAR COMO LEÍDAS
-// ------------------------------
-pg_query_params($conn, "UPDATE notificaciones SET leida = TRUE WHERE id_usuario = $1", [$id_usuario]);
+// ======================================================
+// 📌 TRAER NOTIFICACIONES AGRUPADAS POR FECHA
+// ======================================================
+// Supabase no soporta aggregates complejos directamente → agrupamos en PHP
+$endpoint = "notificaciones?select=*&id_usuario=eq.$id_usuario&order=fecha_creacion.desc";
+list($code, $notificaciones) = supabase_get($endpoint);
 
+if ($code !== 200) {
+    die("<h3>Error cargando notificaciones.</h3>");
+}
+
+// Agrupar por fecha (Y-m-d)
+$grupos = [];
+foreach ($notificaciones as $n) {
+    $fecha = substr($n["fecha_creacion"], 0, 10);
+    if (!isset($grupos[$fecha])) $grupos[$fecha] = [];
+    $grupos[$fecha][] = $n;
+}
+
+
+// ======================================================
+// 🔔 MARCAR TODAS COMO LEÍDAS
+// ======================================================
+supabase_update("notificaciones?id_usuario=eq.$id_usuario", ["leida" => true]);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -58,13 +92,13 @@ pg_query_params($conn, "UPDATE notificaciones SET leida = TRUE WHERE id_usuario 
 </head>
 
 <body class="bg-gray-100">
-<?php include(__DIR__ . '/../includes/header.php'); ?>
+<?php include('../includes/header.php'); ?>
 
 <div class="max-w-3xl mx-auto mt-10 p-6 bg-white shadow-lg rounded-xl">
     <h2 class="text-3xl font-bold text-green-700 text-center mb-2">🔔 Mis Notificaciones</h2>
     <p class="text-gray-600 text-center mb-6">Consulta tus avisos importantes sobre reservas y actividades.</p>
 
-    <?php if (pg_num_rows($result) > 0): ?>
+    <?php if (!empty($grupos)): ?>
 
         <div class="text-right mb-4">
             <a href="?borrar_todas=1" 
@@ -74,26 +108,24 @@ pg_query_params($conn, "UPDATE notificaciones SET leida = TRUE WHERE id_usuario 
             </a>
         </div>
 
-        <?php while ($grupo = pg_fetch_assoc($result)): 
-            $fecha = date("d/m/Y", strtotime($grupo['fecha']));
-            $titulos = explode("||", $grupo["titulos"]);
-            $mensajes = explode("||", $grupo["mensajes"]);
-            $tipos = explode("||", $grupo["tipos"]);
-            $ids = explode(",", $grupo["ids"]);
+        <?php foreach ($grupos as $fecha => $items): ?>
+
+        <?php
+            $fechaMostrada = date("d/m/Y", strtotime($fecha));
         ?>
 
         <!-- ACORDEÓN -->
         <button onclick="toggleAcordeon(this)" 
                 class="w-full text-left px-5 py-3 mb-2 bg-green-100 hover:bg-green-200 text-green-800 font-semibold rounded-lg transition flex justify-between">
-            <span>📅 <?= $fecha ?> (<?= count($titulos) ?>)</span>
+            <span>📅 <?= $fechaMostrada ?> (<?= count($items) ?>)</span>
             <span>▼</span>
         </button>
 
         <div class="hidden mb-4 px-4">
 
-            <?php foreach ($titulos as $i => $titulo): 
-                $tipo = $tipos[$i];
-                $color = match($tipo) {
+            <?php foreach ($items as $n): 
+
+                $color = match($n["tipo"]) {
                     "error"  => "bg-red-100 border-red-500",
                     "alerta" => "bg-yellow-100 border-yellow-500",
                     "exito"  => "bg-green-100 border-green-500",
@@ -102,20 +134,21 @@ pg_query_params($conn, "UPDATE notificaciones SET leida = TRUE WHERE id_usuario 
             ?>
 
             <div class="relative p-4 border-l-4 <?= $color ?> rounded-lg shadow-sm mb-3 animation-slide">
-                <button onclick="borrarNotificacion(<?= $ids[$i] ?>)"
+
+                <button onclick="borrarNotificacion(<?= $n['id_notificacion'] ?>)"
                         class="absolute top-2 right-3 text-red-600 font-bold hover:text-red-800 text-lg">
                     ×
                 </button>
 
-                <h4 class="font-semibold text-gray-800"><?= htmlspecialchars($titulo) ?></h4>
-                <p class="text-gray-700 text-sm"><?= htmlspecialchars($mensajes[$i]) ?></p>
+                <h4 class="font-semibold text-gray-800"><?= htmlspecialchars($n["titulo"]) ?></h4>
+                <p class="text-gray-700 text-sm"><?= htmlspecialchars($n["mensaje"]) ?></p>
             </div>
 
             <?php endforeach; ?>
 
         </div>
 
-        <?php endwhile; ?>
+        <?php endforeach; ?>
 
     <?php else: ?>
 
@@ -126,8 +159,8 @@ pg_query_params($conn, "UPDATE notificaciones SET leida = TRUE WHERE id_usuario 
 
 <script>
 function toggleAcordeon(btn) {
-    const content = btn.nextElementSibling;
-    content.classList.toggle("hidden");
+    const panel = btn.nextElementSibling;
+    panel.classList.toggle("hidden");
 }
 
 function borrarNotificacion(id) {
@@ -138,16 +171,13 @@ function borrarNotificacion(id) {
 </script>
 
 <style>
-/* Animación suave */
-.animation-slide {
-    animation: slideIn 0.3s ease-out;
-}
+.animation-slide { animation: slideIn 0.3s ease-out; }
 @keyframes slideIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
+    from { opacity:0; transform: translateY(6px); }
+    to   { opacity:1; transform: translateY(0); }
 }
 </style>
 
-<?php include(__DIR__ . '/../includes/footer.php'); ?>
+<?php include('../includes/footer.php'); ?>
 </body>
 </html>
