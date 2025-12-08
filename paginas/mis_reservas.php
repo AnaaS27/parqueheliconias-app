@@ -8,18 +8,27 @@ $id_usuario = $_SESSION['usuario_id'];
 // -----------------------------------------------------------
 // 🔎 CONSULTA A SUPABASE (solo reservas pendientes)
 // -----------------------------------------------------------
-list($code, $reservas) = supabase_get(
-    "reservas?
-     select=id_reserva,fecha_reserva,fecha_cancelacion,estado,tipo_reserva,numero_participantes,
-     actividades(nombre,descripcion)
-     &id_usuario=eq.$id_usuario
-     &estado=eq.pendiente
-     &order=fecha_reserva.desc"
-);
+// Endpoint limpio SIN saltos de línea, sin espacios ilegales
+$endpoint =
+    "reservas?"
+    . "select=id_reserva,fecha_reserva,fecha_cancelacion,estado,tipo_reserva,numero_participantes,"
+    . "actividades(nombre,descripcion)"
+    . "&id_usuario=eq.$id_usuario"
+    . "&estado=eq.pendiente"
+    . "&order=fecha_reserva.desc";
 
-// Manejo de error Supabase
+// Consumir API REST
+list($code, $reservas) = supabase_get($endpoint);
+
+// Mostrar error si falla
 if ($code !== 200) {
-    die("❌ Error consultando Supabase: " . json_encode($reservas));
+    echo "<h2>Error consultando Supabase</h2>";
+    echo "<pre>";
+    var_dump($code);
+    var_dump($reservas);
+    echo "ENDPOINT: $endpoint";
+    echo "</pre>";
+    exit;
 }
 ?>
 
@@ -35,7 +44,6 @@ if ($code !== 200) {
   <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 
   <style>
-    /* 🌿 Barra de búsqueda */
     .busqueda-container {
       display: flex;
       flex-wrap: wrap;
@@ -88,7 +96,6 @@ if ($code !== 200) {
     <a href="historial_reservas.php" class="boton-historial">📜 Ver historial de reservas</a>
   </div>
 
-  <!-- 🔎 BUSCADOR -->
   <div class="busqueda-container">
     <input type="text" id="buscador" placeholder="Buscar por nombre o fecha...">
   </div>
@@ -97,51 +104,54 @@ if ($code !== 200) {
     <section class="grid-reservas" id="listaReservas">
 
       <?php foreach ($reservas as $reserva): ?>
-        <?php
-          $estadoClase = strtolower($reserva['estado']);
-          $icono = [
-            'pendiente' => '⏳',
-            'confirmada' => '✅',
-            'cancelada' => '❌'
-          ][$estadoClase] ?? '🟢';
 
-          $actividad = $reserva['actividades']['nombre'] ?? "Actividad";
-          $descripcion = $reserva['actividades']['descripcion'] ?? "";
+        <?php
+          $estadoClase = strtolower($reserva["estado"]);
+          $icono = [
+            "pendiente" => "⏳",
+            "confirmada" => "✅",
+            "cancelada" => "❌"
+          ][$estadoClase] ?? "🟢";
+
+          $actividad = $reserva["actividades"]["nombre"] ?? "Actividad";
+          $descripcion = $reserva["actividades"]["descripcion"] ?? "";
         ?>
-        
+
         <article class="card-reserva <?= $estadoClase ?>" data-estado="<?= $estadoClase ?>">
+
           <div class="reserva-header">
             <h3 class="nombre-actividad"><?= htmlspecialchars($actividad) ?></h3>
             <span class="estado <?= $estadoClase ?>">
-              <?= $icono . " " . ucfirst($reserva['estado']) ?>
+              <?= $icono . " " . ucfirst($reserva["estado"]) ?>
             </span>
           </div>
 
-          <p><b>Tipo:</b> <?= ucfirst($reserva['tipo_reserva']) ?></p>
-          <p><b>Participantes:</b> <?= $reserva['numero_participantes'] ?></p>
+          <p><b>Tipo:</b> <?= ucfirst($reserva["tipo_reserva"]) ?></p>
+          <p><b>Participantes:</b> <?= $reserva["numero_participantes"] ?></p>
 
           <p><b>Fecha reserva:</b>
             <span class="fecha-reserva">
-              <?= date("d/m/Y", strtotime($reserva['fecha_reserva'])) ?>
+              <?= date("d/m/Y", strtotime($reserva["fecha_reserva"])) ?>
             </span>
           </p>
 
           <p class="descripcion"><?= htmlspecialchars($descripcion) ?></p>
 
           <div class="acciones-reserva">
-            <a href="cancelar_reserva.php?id=<?= $reserva['id_reserva'] ?>" 
+            <a href="cancelar_reserva.php?id=<?= $reserva["id_reserva"] ?>" 
                class="btn-cancelar"
                onclick="return confirm('¿Cancelar esta reserva?');">
               Cancelar
             </a>
 
-            <a href="detalle_reserva.php?id=<?= $reserva['id_reserva'] ?>" 
+            <a href="detalle_reserva.php?id=<?= $reserva["id_reserva"] ?>" 
                class="btn-detalle">
               Ver Detalle
             </a>
           </div>
 
         </article>
+
       <?php endforeach; ?>
 
     </section>
@@ -162,7 +172,6 @@ if ($code !== 200) {
 <?php include('../includes/footer.php'); ?>
 
 <script>
-// 🔍 Filtro de búsqueda
 const buscador = document.getElementById("buscador");
 const cards = document.querySelectorAll("#listaReservas article");
 
@@ -172,8 +181,8 @@ buscador.addEventListener("keyup", () => {
     cards.forEach(card => {
         const nombre = card.querySelector(".nombre-actividad").textContent.toLowerCase();
         const fecha = card.querySelector(".fecha-reserva").textContent.toLowerCase();
-
         const coincide = nombre.includes(texto) || fecha.includes(texto);
+
         card.style.display = coincide ? "block" : "none";
     });
 });
