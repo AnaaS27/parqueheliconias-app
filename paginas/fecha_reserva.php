@@ -15,10 +15,10 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 
 // -----------------------------------------------------
-// 🔒 Validar que llegue actividad_id por GET
+// 🔒 Recibir datos enviados por detalle_actividad.php
 // -----------------------------------------------------
 $actividad_id = $_POST['id_actividad'] ?? null;
-$tipo = $_POST['tipo'] ?? 'individual';
+$tipo = $_POST['tipo_reserva'] ?? 'individual';   // ✔ nombre correcto
 
 if (!$actividad_id) {
     echo "<script>
@@ -47,7 +47,6 @@ $actividad = $actividadData[0];
 // 🔎 2. Traer instituciones desde Supabase
 // -----------------------------------------------------
 [$codeInst, $instData] = supabase_get("instituciones?select=id_institucion,nombre_institucion&order=nombre_institucion.asc");
-
 ?>
 <!DOCTYPE html>
 <html lang="es">
