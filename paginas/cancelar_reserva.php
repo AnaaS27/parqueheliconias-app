@@ -1,14 +1,16 @@
 <?php
 session_start();
 include('../includes/verificar_sesion.php');
-include('../includes/conexion.php');
+include('../includes/supabase.php');
 
 $id_usuario = $_SESSION['usuario_id'];
 
-// Validar ID recibido
+// ---------------------------
+// ✔ Validar ID recibido
+// ---------------------------
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     $_SESSION['toast'] = [
-        'tipo' => 'warning',
+        'tipo'    => 'warning',
         'mensaje' => '⚠️ Parámetro inválido para cancelar la reserva.'
     ];
     header("Location: mis_reservas.php");
@@ -17,65 +19,76 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 
 $id_reserva = intval($_GET['id']);
 
-// 🔍 Verificar si la reserva pertenece al usuario y está pendiente
-$sql = "SELECT estado 
-        FROM reservas 
-        WHERE id_reserva = $1 AND id_usuario = $2";
+// ---------------------------
+// 🔍 1. Verificar que la reserva existe y pertenece al usuario
+// ---------------------------
+list($codeRes, $dataRes) = supabase_get(
+    "reservas?id_reserva=eq.$id_reserva&id_usuario=eq.$id_usuario&select=id_reserva,estado"
+);
 
-$result = pg_query_params($conn, $sql, [$id_reserva, $id_usuario]);
-
-if (!$result || pg_num_rows($result) === 0) {
+if ($codeRes !== 200 || empty($dataRes)) {
     $_SESSION['toast'] = [
-        'tipo' => 'warning',
+        'tipo'    => 'warning',
         'mensaje' => '⚠️ No se encontró la reserva o no pertenece a tu cuenta.'
     ];
     header("Location: mis_reservas.php");
     exit;
 }
 
-$reserva = pg_fetch_assoc($result);
+$reserva = $dataRes[0];
 
-if ($reserva['estado'] !== 'pendiente') {
+// ---------------------------
+// ❌ No se puede cancelar si no está pendiente
+// ---------------------------
+if ($reserva["estado"] !== "pendiente") {
     $_SESSION['toast'] = [
-        'tipo' => 'error',
+        'tipo'    => 'error',
         'mensaje' => '❌ Solo se pueden cancelar reservas en estado pendiente.'
     ];
     header("Location: mis_reservas.php");
     exit;
 }
 
-// 📝 Actualizar estado a cancelada
-$update = "UPDATE reservas 
-           SET estado = 'cancelada', fecha_cancelacion = NOW() 
-           WHERE id_reserva = $1";
+// ---------------------------
+// 📝 2. Actualizar estado a CANCELADA
+// ---------------------------
+$updateData = [
+    "estado"           => "cancelada",
+    "fecha_cancelacion"=> date("c")  // formato ISO 8601
+];
 
-$updateResult = pg_query_params($conn, $update, [$id_reserva]);
+list($codeUpdate, $resUpdate) = supabase_update("reservas?id_reserva=eq.$id_reserva", $updateData);
 
-if ($updateResult) {
+if ($codeUpdate === 200) {
     $_SESSION['toast'] = [
-        'tipo' => 'success',
+        'tipo'    => 'success',
         'mensaje' => '✅ ¡Reserva cancelada exitosamente!'
     ];
 } else {
     $_SESSION['toast'] = [
-        'tipo' => 'error',
+        'tipo'    => 'error',
         'mensaje' => '❌ Error al cancelar la reserva. Intenta nuevamente.'
     ];
 }
 
-// Crear notificación
-$mensaje = "Tu reserva #$id_reserva ha sido cancelada exitosamente.";
-$titulo  = "Reserva Cancelada";
-$tipo    = "alerta";
+// ---------------------------
+// 🔔 3. Crear notificación
+// ---------------------------
+$notificacion = [
+    "id_usuario"     => $id_usuario,
+    "id_reserva"     => $id_reserva,
+    "mensaje"        => "Tu reserva #$id_reserva ha sido cancelada exitosamente.",
+    "titulo"         => "Reserva Cancelada",
+    "tipo"           => "alerta",
+    "leida"          => false,
+    "fecha_creacion" => date("c")
+];
 
-$sql_notificacion = "INSERT INTO notificaciones (id_usuario, id_reserva, mensaje, titulo, tipo, leida, fecha_creacion) 
-                     VALUES ($1, $2, $3, $4, $5, false, NOW())";
+supabase_insert("notificaciones", $notificacion); // no importa si falla o no
 
-pg_query_params($conn, $sql_notificacion, [$id_usuario, $id_reserva, $mensaje, $titulo, $tipo]);
-
-
-// Redirigir de vuelta al listado
+// ---------------------------
+// 🔁 Redirigir
+// ---------------------------
 header("Location: mis_reservas.php");
 exit;
 ?>
-
