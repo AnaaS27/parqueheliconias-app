@@ -61,11 +61,11 @@ list($codeReserva, $reservaData) = supabase_insert("reservas", $nuevaReserva);
 // var_dump($codeReserva, $reservaData); exit;
 
 if ($codeReserva !== 201) {
-    echo "<script>
-        alert('❌ Error al insertar la reserva. Detalles: " . json_encode($reservaData) . "');
-        window.location = 'actividades.php';
-    </script>";
+    $_SESSION["mensaje_reserva"] = "❌ Error al insertar la reserva. " . json_encode($reservaData);
+    $_SESSION["tipo_reserva"] = "error";
+    header("Location: mensajes_reserva.php");
     exit;
+
 }
 
 $id_reserva = $reservaData[0]["id_reserva"];
@@ -97,20 +97,19 @@ list($codePart, $partData) = supabase_insert("participantes_reserva", $participa
 // var_dump($codePart, $partData); exit;
 
 if ($codePart !== 201) {
-    echo "<script>
-        alert('❌ Error al registrar el participante. Detalles: " . json_encode($partData) . "');
-        window.location = 'actividades.php';
-    </script>";
+    $_SESSION["mensaje_reserva"] = "❌ Error al registrar el participante. " . json_encode($partData);
+    $_SESSION["tipo_reserva"] = "error";
+    header("Location: mensajes_reserva.php");
     exit;
+
 }
 
 // ----------------------------------------------------------------------
 // 🎉 FINALIZACIÓN
 // ----------------------------------------------------------------------
-echo "<script>
-    alert('✅ Reserva realizada exitosamente.');
-    window.location = 'mis_reservas.php';
-</script>";
+$_SESSION["mensaje_reserva"] = "¡Reserva realizada exitosamente! 🎉";
+$_SESSION["tipo_reserva"] = "exito";
+header("Location: mensajes_reserva.php");
 exit;
 
 ?>
