@@ -253,7 +253,9 @@ form.addEventListener("submit", function (e) {
             mensaje.textContent = "⚠️ Debes ingresar al menos 2 personas.";
             return;
         }
-        form.action = "participantes_reserva.php";
+        
+        // 👉 Enviar parámetros necesarios por GET
+        form.action = "participantes_reserva.php?id_actividad=<?= $item['id_actividad'] ?>&cantidad=" + cantidad;
     } else {
         form.action = "fecha_reserva.php";
     }
