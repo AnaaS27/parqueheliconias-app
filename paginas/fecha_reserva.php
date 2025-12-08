@@ -17,8 +17,8 @@ if (!isset($_SESSION['usuario_id'])) {
 // -----------------------------------------------------
 // 🔒 Validar que llegue actividad_id por GET
 // -----------------------------------------------------
-$actividad_id = $_GET['id_actividad'] ?? null;
-$tipo = $_GET['tipo'] ?? 'individual';
+$actividad_id = $_POST['id_actividad'] ?? null;
+$tipo = $_POST['tipo'] ?? 'individual';
 
 if (!$actividad_id) {
     echo "<script>
