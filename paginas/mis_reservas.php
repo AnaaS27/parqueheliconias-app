@@ -63,51 +63,6 @@ if ($codeRes !== 200 || !is_array($reservas)) {
 </head>
 
 <body>
-
-<!-- ⭐ HEADER INTEGRADO AQUÍ (Supabase) -->
-<header class="user-header">
-
-    <div class="top-bar">
-        <div class="perfil">
-            <?php if (isset($_SESSION['usuario_id'])): ?>
-                <a href="../paginas/logout.php" class="perfil-link cerrar-sesion">
-                    <img src="../assets/img/perfil.png" class="icono-perfil">
-                    <span>Cerrar sesión</span>
-                </a>
-            <?php else: ?>
-                <a href="../paginas/login.php" class="perfil-link">
-                    <img src="../assets/img/perfil.png" class="icono-perfil">
-                    <span>Ingresar al perfil</span>
-                </a>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <nav>
-        <div class="logo-title">
-            <img src="../assets/img/logoo.png" class="logo">
-            <span class="titulo">CEA PARQUE DE LAS HELICONIAS</span>
-        </div>
-
-        <ul>
-            <li><a href="../index.php">Inicio</a></li>
-            <li><a href="../paginas/actividades.php">Actividades</a></li>
-            <li><a href="../paginas/contacto.php">Contacto</a></li>
-
-            <?php if (isset($_SESSION['usuario_id'])): ?>
-                <li class="noti-nav">
-                    <a href="../paginas/notificaciones.php" class="noti-link">
-                        <img src="../assets/img/bell.svg" class="icono-perfil">
-                        <?php if ($notiCount > 0): ?>
-                            <span class="badge"><?= $notiCount ?></span>
-                        <?php endif; ?>
-                    </a>
-                </li>
-            <?php endif; ?>
-        </ul>
-    </nav>
-
-</header>
 <!-- ⭐ FIN DEL HEADER -->
 
 <main class="contenedor-panel reservas-wrapper">
