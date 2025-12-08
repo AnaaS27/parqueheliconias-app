@@ -71,12 +71,12 @@ $id_reserva = $reservaData[0]["id_reserva"];
 
 $participante = [
     "id_reserva"           => $id_reserva,
-    "id_usuario"           => null,
+    "id_usuario"           => $id_usuario,  // ✔ usuario autenticado
     "nombre"               => $nombre,
     "apellido"             => $apellido,
     "documento"            => $documento,
     "telefono"             => $telefono,
-    "es_usuario_registrado"=> false,
+    "es_usuario_registrado"=> true,          // ✔ es usuario del sistema
     "id_genero"            => $id_genero,
     "id_institucion"       => $institucion,
     "fecha_nacimiento"     => $fecha_nacimiento,
@@ -85,6 +85,7 @@ $participante = [
     "fecha_visita"         => $fecha_visita,
     "observaciones"        => $observaciones
 ];
+
 
 list($codePart, $partData) = supabase_insert("participantes_reserva", $participante);
 
