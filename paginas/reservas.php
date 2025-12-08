@@ -5,19 +5,25 @@ include('../includes/supabase.php');
 
 // 🛑 Verificar sesión
 if (!isset($_SESSION['usuario_id'])) {
-    echo "<script>alert('⚠️ Debes iniciar sesión.'); window.location='../login.php';</script>";
+    echo "<script>
+        alert('⚠️ Debes iniciar sesión para realizar una reserva.');
+        window.location = '../login.php';
+    </script>";
     exit;
 }
 
 // 🛑 Verificar datos del formulario
 if (!isset($_POST['id_actividad'])) {
-    echo "<script>alert('⚠️ No se especificó la actividad.'); window.location='actividades.php';</script>";
+    echo "<script>
+        alert('⚠️ No se especificó la actividad.');
+        window.location = 'actividades.php';
+    </script>";
     exit;
 }
 
-$id_usuario      = $_SESSION['usuario_id'];
-$id_actividad    = intval($_POST['id_actividad']);
-$tipo_reserva    = $_POST['tipo_reserva'] ?? "individual";  // ✔ tomarlo del form
+$id_usuario    = intval($_SESSION['usuario_id']);
+$id_actividad  = intval($_POST['id_actividad']);
+$tipo_reserva  = $_POST['tipo_reserva'] ?? "individual";
 
 $fecha_visita       = $_POST['fecha_visita'];
 $tipo_documento     = $_POST['tipo_documento'];
@@ -27,10 +33,10 @@ $id_genero          = $_POST['sexo'];
 $id_ciudad          = $_POST['id_ciudad'];
 $telefono           = $_POST['telefono'];
 
-$institucion        = $_POST['institucion'] !== "" ? intval($_POST['institucion']) : null;
+$institucion        = ($_POST['institucion'] !== "") ? intval($_POST['institucion']) : null;
 $observaciones      = $_POST['observaciones'] ?? null;
 
-// TOMAR NOMBRE Y APELLIDO DEL USUARIO LOGUEADO (NO DEL FORM)
+// Tomar nombre y apellido del usuario logueado
 $nombre   = $_SESSION['nombre'] ?? "Visitante";
 $apellido = $_SESSION['apellido'] ?? "";
 
@@ -44,18 +50,19 @@ $nuevaReserva = [
     "tipo_reserva"          => strtolower($tipo_reserva),
     "estado"                => "pendiente",
     "numero_participantes"  => 1,
-    "fecha_reserva"         => date("c"),        // ✔ formato ISO
-    "fecha_visita"          => $fecha_visita
+    "fecha_reserva"         => date("c"),  // formato ISO8601
+    "fecha_visita"          => $fecha_visita   // AHORA SÍ EXISTE EN LA TABLA
 ];
 
+// Insertar en Supabase
 list($codeReserva, $reservaData) = supabase_insert("reservas", $nuevaReserva);
 
-// DEBUG: ver error real
-var_dump($codeReserva, $reservaData); exit;
+// DEBUG opcional
+// var_dump($codeReserva, $reservaData); exit;
 
 if ($codeReserva !== 201) {
     echo "<script>
-        alert('❌ Error al insertar la reserva. SUPABASE DICE: ".json_encode($reservaData)."');
+        alert('❌ Error al insertar la reserva. Detalles: " . json_encode($reservaData) . "');
         window.location = 'actividades.php';
     </script>";
     exit;
@@ -66,28 +73,32 @@ $id_reserva = $reservaData[0]["id_reserva"];
 // ----------------------------------------------------------------------
 // 2️⃣ INSERTAR PARTICIPANTE INDIVIDUAL
 // ----------------------------------------------------------------------
+
 $participante = [
     "id_reserva"           => $id_reserva,
-    "id_usuario"           => $id_usuario,
+    "id_usuario"           => $id_usuario,  // Usuario autenticado
     "nombre"               => $nombre,
     "apellido"             => $apellido,
     "documento"            => $documento,
     "telefono"             => $telefono,
-    "es_usuario_registrado"=> true,
+    "es_usuario_registrado"=> true,          // ✔ usuario del sistema
     "id_genero"            => $id_genero,
     "id_institucion"       => $institucion,
     "fecha_nacimiento"     => $fecha_nacimiento,
     "id_ciudad"            => $id_ciudad,
     "id_interes"           => null,
-    "fecha_visita"         => $fecha_visita,
+    "fecha_visita"         => $fecha_visita, // ✔ aquí sí existe en la tabla
     "observaciones"        => $observaciones
 ];
 
 list($codePart, $partData) = supabase_insert("participantes_reserva", $participante);
 
+// DEBUG opcional
+// var_dump($codePart, $partData); exit;
+
 if ($codePart !== 201) {
     echo "<script>
-        alert('❌ Error al registrar el participante. ".json_encode($partData)."');
+        alert('❌ Error al registrar el participante. Detalles: " . json_encode($partData) . "');
         window.location = 'actividades.php';
     </script>";
     exit;
