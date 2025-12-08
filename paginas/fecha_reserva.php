@@ -1,7 +1,7 @@
 <?php
 session_start();
 include('../includes/verificar_sesion.php');
-include('../includes/conexion.php');
+include('../includes/supabase.php');
 
 // Verificar sesión
 if (!isset($_SESSION['usuario_id'])) {
@@ -13,15 +13,15 @@ if (!isset($_SESSION['usuario_id'])) {
 }
 
 // Verificar actividad
-if (!isset($_GET['actividad_id'])) {
+if (!isset($_GET['id_actividad'])) {
     echo "<script>alert('Actividad no seleccionada.'); window.location='actividades.php';</script>";
     exit;
 }
 
-$actividad_id = intval($_GET['actividad_id']);
+$actividad_id = intval($_GET['id_actividad']);
 
 // Cargar institución
-$instituciones = $conn->query("SELECT id_institucion, nombre FROM instituciones ORDER BY nombre ASC");
+$instituciones = $conn->query("SELECT id_institucion, nombre FROM instituciones ORDER BY nombre_institucion ASC");
 
 // Tipo de reserva
 $tipo = isset($_GET['tipo']) ? $_GET['tipo'] : 'individual';
