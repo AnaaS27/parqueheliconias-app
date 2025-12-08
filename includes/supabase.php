@@ -10,7 +10,7 @@ $supabase_url = getenv("DATABASE_URL");
 $supabase_key = getenv("SUPABASE_KEY");
 
 if (!$supabase_url || !$supabase_key) {
-    die("❌ ERROR: Las variables SUPABASE_URL y SUPABASE_KEY no están configuradas.");
+    die("❌ ERROR: Las variables DATABASE_URL y SUPABASE_KEY no están configuradas.");
 }
 
 /* ===========================================================
