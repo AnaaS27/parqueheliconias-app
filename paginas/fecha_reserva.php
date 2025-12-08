@@ -18,7 +18,7 @@ if (!isset($_SESSION['usuario_id'])) {
 // 🔒 Recibir datos enviados por detalle_actividad.php
 // -----------------------------------------------------
 $actividad_id = $_POST['id_actividad'] ?? null;
-$tipo = $_POST['tipo_reserva'] ?? 'individual';   // ✔ nombre correcto
+$tipo = $_POST['tipo_reserva'] ?? 'individual';
 
 if (!$actividad_id) {
     echo "<script>
@@ -53,55 +53,95 @@ $actividad = $actividadData[0];
 <head>
     <meta charset="UTF-8">
     <title>Fecha de Reserva</title>
+
+    <!-- Tailwind CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-<h2>Reservar: <?= htmlspecialchars($actividad['nombre']) ?></h2>
+<div class="bg-white w-full max-w-lg shadow-xl rounded-xl p-8">
 
-<form action="procesar_reserva.php" method="POST">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
+        Reservar: <?= htmlspecialchars($actividad['nombre']) ?>
+    </h2>
 
-    <!-- Mandar datos -->
-    <input type="hidden" name="actividad_id" value="<?= $actividad_id ?>">
-    <input type="hidden" name="tipo_reserva" value="<?= $tipo ?>">
+    <form action="procesar_reserva.php" method="POST" class="space-y-5">
 
-    <!-- Fecha -->
-    <label>📅 Fecha de visita:</label>
-    <input type="date" name="fecha_visita" required min="<?= date("Y-m-d") ?>">
-    <br><br>
+        <!-- Hidden fields -->
+        <input type="hidden" name="actividad_id" value="<?= $actividad_id ?>">
+        <input type="hidden" name="tipo_reserva" value="<?= $tipo ?>">
 
-    <!-- Institución -->
-    <label>🏫 Institución:</label>
-    <select name="id_institucion" required>
-        <option value="">Seleccione</option>
+        <!-- Fecha -->
+        <div>
+            <label class="block mb-1 font-semibold text-gray-700">📅 Fecha de visita</label>
+            <input 
+                type="date" 
+                name="fecha_visita" 
+                required 
+                min="<?= date("Y-m-d") ?>"
+                class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            >
+        </div>
 
-        <?php if ($codeInst === 200 && !empty($instData)): ?>
-            <?php foreach ($instData as $inst): ?>
-                <option value="<?= $inst['id_institucion'] ?>">
-                    <?= htmlspecialchars($inst['nombre_institucion']) ?>
-                </option>
-            <?php endforeach; ?>
-        <?php else: ?>
-            <option disabled>No hay instituciones registradas</option>
+        <!-- Institución -->
+        <div>
+            <label class="block mb-1 font-semibold text-gray-700">🏫 Institución</label>
+            <select 
+                name="id_institucion" 
+                required
+                class="w-full px-3 py-2 border rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            >
+                <option value="">Seleccione</option>
+
+                <?php if ($codeInst === 200 && !empty($instData)): ?>
+                    <?php foreach ($instData as $inst): ?>
+                        <option value="<?= $inst['id_institucion'] ?>">
+                            <?= htmlspecialchars($inst['nombre_institucion']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <option disabled>No hay instituciones registradas</option>
+                <?php endif; ?>
+            </select>
+        </div>
+
+        <!-- Campos solo para reservas grupales -->
+        <?php if ($tipo === 'grupal'): ?>
+
+            <div>
+                <label class="block mb-1 font-semibold text-gray-700">👥 Nombre del grupo</label>
+                <input 
+                    type="text" 
+                    name="nombre_grupo" 
+                    required
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+            </div>
+
+            <div>
+                <label class="block mb-1 font-semibold text-gray-700">👤 Número de participantes</label>
+                <input 
+                    type="number" 
+                    name="numero_participantes" 
+                    min="2" 
+                    required
+                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                >
+            </div>
+
         <?php endif; ?>
 
-    </select>
-    <br><br>
+        <!-- Submit -->
+        <button 
+            type="submit"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition"
+        >
+            Continuar →
+        </button>
 
-    <?php if ($tipo === 'grupal'): ?>
+    </form>
 
-        <!-- Nombre del grupo -->
-        <label>👥 Nombre del grupo:</label>
-        <input type="text" name="nombre_grupo" required><br><br>
-
-        <!-- Número de participantes -->
-        <label>👤 Número de participantes:</label>
-        <input type="number" name="numero_participantes" min="2" required><br><br>
-
-    <?php endif; ?>
-
-    <button type="submit">Continuar →</button>
-
-</form>
+</div>
 
 </body>
 </html>
