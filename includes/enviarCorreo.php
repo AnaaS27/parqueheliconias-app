@@ -21,8 +21,8 @@ function smtpConfig(PHPMailer $mail)
 
     $mail->setFrom("pruebaheliconas@gmail.com", "Parque Las Heliconias");
 
-    // 🔥 Corrección importante para acentos
-    $mail->CharSet = 'UTF-8';
+    // 🔤 Soporte para tildes y caracteres especiales
+    $mail->CharSet  = 'UTF-8';
     $mail->Encoding = 'base64';
 }
 
@@ -44,28 +44,31 @@ function enviarCorreo($correoDestino, $nombreUsuario, $asunto, $mensajeHTML, $em
             if (file_exists($rutaLogo)) {
                 $idLogo = uniqid('logo_');
                 $mail->AddEmbeddedImage($rutaLogo, $idLogo, basename($rutaLogo));
+                // Reemplazar el CID genérico por el real
                 $mensajeHTML = str_replace("cid:logoHeliconias", "cid:$idLogo", $mensajeHTML);
             }
         }
 
         $mail->isHTML(true);
         $mail->Subject = $asunto;
-        $mail->Body = $mensajeHTML;
+        $mail->Body    = $mensajeHTML;
 
         $mail->send();
         return true;
 
     } catch (Exception $e) {
-        @file_put_contents(__DIR__ . '/../logs/mail_errors.log', 
-            date('Y-m-d H:i:s') . " - Error enviando correo a {$correoDestino}: " . $mail->ErrorInfo . PHP_EOL, 
-            FILE_APPEND);
+        @file_put_contents(
+            __DIR__ . '/../logs/mail_errors.log',
+            date('Y-m-d H:i:s') . " - Error enviando correo a {$correoDestino}: " . $mail->ErrorInfo . PHP_EOL,
+            FILE_APPEND
+        );
 
         return false;
     }
 }
 
 /**
- * 📩 CORREO PLANTILLA: CONFIRMACIÓN DE RESERVA
+ * 📩 CORREO PLANTILLA: CONFIRMACIÓN DE RESERVA INDIVIDUAL
  */
 function enviarCorreoReserva($correoDestino, $nombreUsuario, $id_reserva, $fecha_visita, $actividad)
 {
@@ -103,13 +106,14 @@ function enviarCorreoReserva($correoDestino, $nombreUsuario, $id_reserva, $fecha
     return enviarCorreo($correoDestino, $nombreUsuario, $asunto, $mensajeHTML, true);
 }
 
+/**
+ * 📩 CORREO PLANTILLA: CONFIRMACIÓN RESERVA GRUPAL
+ */
 function enviarCorreoReservaGrupal($correoDestino, $nombreUsuario, $id_reserva, $fecha_visita, $actividad, $cantidad, $responsable, $participantesExtra = [])
 {
     $asunto = "Confirmación de Reserva Grupal #$id_reserva - Parque Las Heliconias";
 
-    // =====================================
-    // 📝 Construir tabla de participantes
-    // =====================================
+    // 📝 Tabla de participantes adicionales
     $tablaParticipantes = "";
 
     if (!empty($participantesExtra)) {
@@ -125,19 +129,17 @@ function enviarCorreoReservaGrupal($correoDestino, $nombreUsuario, $id_reserva, 
         foreach ($participantesExtra as $p) {
             $tablaParticipantes .= "
                 <tr>
-                    <td style='padding:8px; border:1px solid #cddccc;'>{$p['nombre']} {$p['apellido']}</td>
-                    <td style='padding:8px; border:1px solid #cddccc;'>{$p['documento']}</td>
-                    <td style='padding:8px; border:1px solid #cddccc;'>{$p['genero']}</td>
-                    <td style='padding:8px; border:1px solid #cddccc;'>{$p['ciudad']}</td>
+                    <td style='padding:8px; border:1px solid #cddccc;'>" . htmlspecialchars($p['nombre'] . ' ' . $p['apellido']) . "</td>
+                    <td style='padding:8px; border:1px solid #cddccc;'>" . htmlspecialchars($p['documento']) . "</td>
+                    <td style='padding:8px; border:1px solid #cddccc;'>" . htmlspecialchars($p['genero']) . "</td>
+                    <td style='padding:8px; border:1px solid #cddccc;'>" . htmlspecialchars($p['ciudad']) . "</td>
                 </tr>";
         }
 
         $tablaParticipantes .= '</table>';
     }
 
-    // =====================================
-    // 📄 PLANTILLA COMPLETA DEL CORREO
-    // =====================================
+    // 📄 Plantilla completa
     $mensajeHTML = '
     <div style="width:100%; background:#f0f7f0; padding:25px 0; font-family:Arial,sans-serif;">
         <div style="max-width:700px; background:#fff; margin:auto; padding:30px; border-radius:12px;">
@@ -152,15 +154,15 @@ function enviarCorreoReservaGrupal($correoDestino, $nombreUsuario, $id_reserva, 
             <p>Tu reserva grupal ha sido registrada exitosamente. Estos son los detalles:</p>
 
             <div style="background:#e8f5e8; padding:15px; border-radius:10px;">
-                <p><strong>ID Reserva:</strong> ' . $id_reserva . '</p>
+                <p><strong>ID Reserva:</strong> ' . intval($id_reserva) . '</p>
                 <p><strong>Actividad:</strong> ' . htmlspecialchars($actividad) . '</p>
                 <p><strong>Fecha de Visita:</strong> ' . htmlspecialchars($fecha_visita) . '</p>
-                <p><strong>Total Participantes:</strong> ' . $cantidad . '</p>
+                <p><strong>Total Participantes:</strong> ' . intval($cantidad) . '</p>
             </div>
 
             <h3 style="margin-top:25px; color:#2e6a30;">🧍 Responsable del Grupo</h3>
             <p>
-                <strong>' . htmlspecialchars($responsable['nombre']) . ' ' . htmlspecialchars($responsable['apellido']) . '</strong><br>
+                <strong>' . htmlspecialchars($responsable['nombre'] . ' ' . $responsable['apellido']) . '</strong><br>
                 Documento: ' . htmlspecialchars($responsable['documento']) . '<br>
                 Teléfono: ' . htmlspecialchars($responsable['telefono']) . '<br>
                 Ciudad: ' . htmlspecialchars($responsable['ciudad']) . '
