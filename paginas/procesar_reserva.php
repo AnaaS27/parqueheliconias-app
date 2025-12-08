@@ -22,7 +22,6 @@ $usuario_id = $_SESSION['usuario_id'];
 if (
     !isset($_POST['id_actividad']) ||
     !isset($_POST['fecha']) ||
-    !isset($_POST['tipo_visitante']) ||
     !isset($_POST['cantidad'])
 ) {
     echo "<script>alert('❌ Faltan datos para procesar la reserva'); window.history.back();</script>";
@@ -31,7 +30,6 @@ if (
 
 $actividad_id   = intval($_POST['id_actividad']);
 $fecha          = $_POST['fecha'];
-$tipo_visitante = $_POST['tipo_visitante'];
 $cantidad       = intval($_POST['cantidad']);
 
 // =============================
@@ -58,14 +56,6 @@ if ($cantidad > $cupos) {
     exit;
 }
 
-// =============================
-// 🧮 Calcular precios
-// =============================
-$precio_unitario = ($tipo_visitante === 'estudiante')
-    ? $actividad["precio_estudiante"]
-    : $actividad["precio_general"];
-
-$precio_total = $precio_unitario * $cantidad;
 
 // =============================
 // 📝 Crear reserva en Supabase
@@ -74,9 +64,7 @@ $nuevaReserva = [
     "usuario_id"     => $usuario_id,
     "id_actividad"   => $actividad_id,
     "fecha_reserva"  => $fecha,
-    "tipo_visitante" => $tipo_visitante,
     "cantidad"       => $cantidad,
-    "precio_total"   => $precio_total,
     "fecha_creacion" => date('Y-m-d H:i:s')
 ];
 

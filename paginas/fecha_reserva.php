@@ -29,7 +29,7 @@ if (!$actividad_id) {
 }
 
 // -----------------------------------------------------
-// 🔎 1. Obtener actividad desde Supabase
+// 🔎 Obtener actividad desde Supabase
 // -----------------------------------------------------
 [$codeAct, $actividadData] = supabase_get("actividades?id_actividad=eq.$actividad_id&select=*");
 
@@ -44,7 +44,7 @@ if ($codeAct !== 200 || empty($actividadData)) {
 $actividad = $actividadData[0];
 
 // -----------------------------------------------------
-// 🔎 2. Traer instituciones desde Supabase
+// 🔎 Traer instituciones desde Supabase
 // -----------------------------------------------------
 [$codeInst, $instData] = supabase_get("instituciones?select=id_institucion,nombre_institucion&order=nombre_institucion.asc");
 ?>
@@ -53,10 +53,9 @@ $actividad = $actividadData[0];
 <head>
     <meta charset="UTF-8">
     <title>Fecha de Reserva</title>
-
-    <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
 <div class="bg-white w-full max-w-lg shadow-xl rounded-xl p-8">
@@ -69,26 +68,30 @@ $actividad = $actividadData[0];
 
         <!-- Hidden fields -->
         <input type="hidden" name="actividad_id" value="<?= $actividad_id ?>">
-        <input type="hidden" name="tipo_reserva" value="<?= $tipo ?>">
 
-        <!-- Fecha -->
+        <?php if ($tipo === 'grupal'): ?>
+            <input type="hidden" name="tipo_reserva" value="grupal">
+        <?php else: ?>
+            <input type="hidden" name="tipo_reserva" value="individual">
+        <?php endif; ?>
+
+        <!-- Fecha de visita -->
         <div>
             <label class="block mb-1 font-semibold text-gray-700">📅 Fecha de visita</label>
             <input 
                 type="date" 
-                name="fecha_visita" 
+                name="fecha" 
                 required 
                 min="<?= date("Y-m-d") ?>"
                 class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
         </div>
 
-        <!-- Institución -->
+        <!-- Institución (si la usas en reservas, si no puedes quitarla) -->
         <div>
             <label class="block mb-1 font-semibold text-gray-700">🏫 Institución</label>
             <select 
-                name="id_institucion" 
-                required
+                name="id_institucion"
                 class="w-full px-3 py-2 border rounded-md bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
                 <option value="">Seleccione</option>
@@ -99,39 +102,32 @@ $actividad = $actividadData[0];
                             <?= htmlspecialchars($inst['nombre_institucion']) ?>
                         </option>
                     <?php endforeach; ?>
-                <?php else: ?>
-                    <option disabled>No hay instituciones registradas</option>
                 <?php endif; ?>
             </select>
         </div>
 
-        <!-- Campos solo para reservas grupales -->
+        <!-- Campos solo grupales -->
         <?php if ($tipo === 'grupal'): ?>
 
             <div>
                 <label class="block mb-1 font-semibold text-gray-700">👥 Nombre del grupo</label>
-                <input 
-                    type="text" 
-                    name="nombre_grupo" 
-                    required
-                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                >
+                <input type="text" name="nombre_grupo" required
+                    class="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:outline-none">
             </div>
 
             <div>
                 <label class="block mb-1 font-semibold text-gray-700">👤 Número de participantes</label>
-                <input 
-                    type="number" 
-                    name="numero_participantes" 
-                    min="2" 
-                    required
-                    class="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                >
+                <input type="number" name="cantidad" min="2" required
+                    class="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:outline-none">
             </div>
+
+        <?php else: ?>
+
+            <!-- Individual: Cantidad = 1 -->
+            <input type="hidden" name="cantidad" value="1">
 
         <?php endif; ?>
 
-        <!-- Submit -->
         <button 
             type="submit"
             class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-lg transition"
