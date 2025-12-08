@@ -1,145 +1,125 @@
 <?php
 session_start();
-require '../includes/verificar_sesion.php';
-require '../includes/supabase.php'; // ← ahora usamos Supabase API REST
+include('../includes/verificar_sesion.php');
+include('../includes/supabase.php');
 
-// -----------------------------------------------------------
-// 🔒 Validar sesión
-// -----------------------------------------------------------
+// =============================
+// 🔐 Verificar sesión
+// =============================
 if (!isset($_SESSION['usuario_id'])) {
     echo "<script>
-        alert('Debes iniciar sesión para realizar una reserva.');
+        alert('⚠️ Debes iniciar sesión para realizar una reserva.');
         window.location = '../login.php';
     </script>";
     exit;
 }
 
-// -----------------------------------------------------------
-// 📥 Validar POST
-// -----------------------------------------------------------
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+$usuario_id = $_SESSION['usuario_id'];
+
+// =============================
+// 📌 Validar datos del formulario
+// =============================
+if (
+    !isset($_POST['id_actividad']) ||
+    !isset($_POST['fecha']) ||
+    !isset($_POST['tipo_visitante']) ||
+    !isset($_POST['cantidad'])
+) {
+    echo "<script>alert('❌ Faltan datos para procesar la reserva'); window.history.back();</script>";
+    exit;
+}
+
+$actividad_id   = intval($_POST['id_actividad']);
+$fecha          = $_POST['fecha'];
+$tipo_visitante = $_POST['tipo_visitante'];
+$cantidad       = intval($_POST['cantidad']);
+
+// =============================
+// 📌 Consultar actividad en Supabase
+// =============================
+$res = supabaseFetch("actividades?id=eq.$actividad_id");
+
+if ($res["code"] !== 200 || empty($res["data"])) {
+    echo "<script>alert('❌ Actividad no encontrada.'); window.history.back();</script>";
+    exit;
+}
+
+$actividad = $res["data"][0];
+$cupos = $actividad["cupos"];
+
+// =============================
+// 🚨 Validar disponibilidad
+// =============================
+if ($cantidad > $cupos) {
     echo "<script>
-        alert('Solicitud inválida.');
-        window.location = 'fecha_reserva.php';
+        alert('❌ No hay suficientes cupos disponibles. Cupos actuales: $cupos');
+        window.history.back();
     </script>";
     exit;
 }
 
-// -----------------------------------------------------------
-// 🧩 Datos recibidos del formulario
-// -----------------------------------------------------------
-$usuario_id      = $_SESSION['usuario_id'];
-$actividad_id    = $_POST['actividad_id'] ?? null;
-$fecha_reserva   = $_POST['fecha'] ?? null;
-$tipo_reserva    = $_POST['tipo_reserva'] ?? 'individual';
-$numero_particip = $_POST['cantidad'] ?? 1;
-$id_institucion  = $_POST['id_institucion'] ?? null;
+// =============================
+// 🧮 Calcular precios
+// =============================
+$precio_unitario = ($tipo_visitante === 'estudiante')
+    ? $actividad["precio_estudiante"]
+    : $actividad["precio_general"];
 
-// -----------------------------------------------------------
-// 🛑 Validación
-// -----------------------------------------------------------
-if (!$actividad_id || !$fecha_reserva) {
-    echo "<script>
-        alert('Todos los campos son obligatorios.');
-        window.location = 'fecha_reserva.php';
-    </script>";
-    exit;
-}
+$precio_total = $precio_unitario * $cantidad;
 
-/* =============================================================
-   1️⃣ CREAR RESERVA EN SUPABASE
-   ============================================================= */
-$reservaData = [
-    "id_usuario"            => $usuario_id,
-    "id_actividad"          => $actividad_id,
-    "id_institucion"        => $id_institucion,
-    "fecha_reserva"         => $fecha_reserva,
-    "tipo_reserva"          => $tipo_reserva,
-    "estado"                => "pendiente",
-    "numero_participantes"  => $numero_particip
+// =============================
+// 📝 Crear reserva en Supabase
+// =============================
+$nuevaReserva = [
+    "usuario_id"     => $usuario_id,
+    "id_actividad"   => $actividad_id,
+    "fecha_reserva"  => $fecha,
+    "tipo_visitante" => $tipo_visitante,
+    "cantidad"       => $cantidad,
+    "precio_total"   => $precio_total,
+    "fecha_creacion" => date('Y-m-d H:i:s')
 ];
 
-[$codeR, $dataR] = supabase_insert("reservas", $reservaData);
+$resReserva = supabaseFetch("reservas", "POST", $nuevaReserva);
 
-if ($codeR !== 201 || empty($dataR)) {
-    echo "<script>alert('❌ Error al registrar la reserva.'); window.location='fecha_reserva.php';</script>";
+if ($resReserva["code"] !== 201) {
+    echo "<script>alert('❌ Error al registrar la reserva.'); window.history.back();</script>";
     exit;
 }
 
-$reserva_id = $dataR[0]["id_reserva"];
+$reserva_id = $resReserva["data"][0]["id"];
 
-/* =============================================================
-   2️⃣ INSERTAR PARTICIPANTE (INDIVIDUAL)
-   ============================================================= */
-if ($tipo_reserva === 'individual') {
+// =============================
+// 👥 Insertar participantes
+// =============================
+for ($i = 0; $i < $cantidad; $i++) {
+    $nombre = $_POST["nombre_$i"] ?? "Participante $i";
+    $documento = $_POST["documento_$i"] ?? null;
 
-    $participanteData = [
-        "id_reserva"            => $reserva_id,
-        "id_usuario"            => $usuario_id,
-        "nombre"                => $_SESSION['nombre'] ?? 'N/A',
-        "apellido"              => $_SESSION['apellido'] ?? null,
-        "documento"             => $_SESSION['documento'] ?? null,
-        "telefono"              => $_SESSION['telefono'] ?? null,
-        "es_usuario_registrado" => true,
-        "id_genero"             => $_SESSION['id_genero'] ?? null,
-        "id_institucion"        => $id_institucion,
-        "fecha_nacimiento"      => $_SESSION['fecha_nacimiento'] ?? null,
-        "id_ciudad"             => $_SESSION['id_ciudad'] ?? null,
-        "id_interes"            => $_SESSION['id_interes'] ?? null,
-        "fecha_visita"          => $fecha_reserva
+    $participante = [
+        "reserva_id" => $reserva_id,
+        "nombre" => $nombre,
+        "documento" => $documento
     ];
 
-    [$codeP, $dataP] = supabase_insert("participantes_reserva", $participanteData);
-
-    if ($codeP !== 201) {
-        echo "<script>alert('❌ Error al registrar participante.'); window.location='fecha_reserva.php';</script>";
-        exit;
-    }
+    supabaseFetch("participantes_reservas", "POST", $participante);
 }
 
-/* =============================================================
-   3️⃣ INSERTAR PARTICIPANTES (GRUPAL)
-   ============================================================= */
-if ($tipo_reserva === 'grupal' && isset($_POST['integrantes'])) {
+// =============================
+// ➖ Actualizar cupos restantes
+// =============================
+$nuevos_cupos = $cupos - $cantidad;
 
-    foreach ($_POST['integrantes'] as $p) {
+supabaseFetch("actividades?id=eq.$actividad_id", "PATCH", [
+    "cupos" => $nuevos_cupos
+]);
 
-        if (empty($p['nombre']) || empty($p['documento'])) {
-            continue;
-        }
-
-        $participanteData = [
-            "id_reserva"            => $reserva_id,
-            "id_usuario"            => $usuario_id,
-            "nombre"                => $p['nombre'],
-            "apellido"              => $p['apellido'] ?? null,
-            "documento"             => $p['documento'],
-            "telefono"              => $p['telefono'] ?? null,
-            "es_usuario_registrado" => false,
-            "id_genero"             => $p['id_genero'] ?? null,
-            "id_institucion"        => $id_institucion,
-            "fecha_nacimiento"      => $p['fecha_nacimiento'] ?? null,
-            "id_ciudad"             => $p['id_ciudad'] ?? null,
-            "id_interes"            => $p['id_interes'] ?? null,
-            "fecha_visita"          => $fecha_reserva
-        ];
-
-        [$codeP, $dataP] = supabase_insert("participantes_reserva", $participanteData);
-
-        if ($codeP !== 201) {
-            echo "<script>alert('❌ Error al registrar participante grupal.'); window.location='fecha_reserva.php';</script>";
-            exit;
-        }
-    }
-}
-
-/* =============================================================
-   🎉 TODO OK
-   ============================================================= */
+// =============================
+// 🎉 Confirmación
+// =============================
 echo "<script>
-    alert('¡Reserva registrada correctamente!');
+    alert('✅ ¡Reserva realizada exitosamente!');
     window.location = 'mis_reservas.php';
 </script>";
-exit;
 
 ?>
