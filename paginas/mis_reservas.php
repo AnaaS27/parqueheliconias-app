@@ -87,6 +87,14 @@ if ($code !== 200) {
 
 <?php include('../includes/header.php'); ?>
 
+<?php if (isset($_SESSION['toast'])): ?>
+    <div class="alert bg-green-100 border-l-4 border-green-600 text-green-800 px-4 py-3 mb-4 rounded">
+        <?= $_SESSION['toast']['mensaje'] ?>
+    </div>
+    <?php unset($_SESSION['toast']); ?>
+<?php endif; ?>
+
+
 <main class="contenedor-panel reservas-wrapper">
 
   <h2 class="titulo-bienvenida">📅 Mis Reservas</h2>

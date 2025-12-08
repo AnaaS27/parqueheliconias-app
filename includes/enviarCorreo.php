@@ -155,4 +155,42 @@ function enviarCorreoPassword($correoDestino, $nombreUsuario)
     return enviarCorreo($correoDestino, $nombreUsuario, $asunto, $mensajeHTML, true);
 }
 
+/**
+ * 📩 CORREO: CANCELACIÓN DE RESERVA
+ */
+function enviarCorreoCancelacion($correoDestino, $nombreUsuario, $id_reserva, $actividad, $fecha_visita)
+{
+    $asunto = "Cancelación de Reserva #$id_reserva - Parque Las Heliconias";
+
+    $mensajeHTML = '
+    <div style="width: 100%; background: #fff4f4; padding: 30px 0; font-family: Arial, sans-serif;">
+        <div style="max-width: 600px; background: white; margin:auto; padding: 25px; border-radius: 10px;">
+
+            <div style="text-align:center;">
+                <img src="cid:logoHeliconias" style="width:120px;margin-bottom:10px">
+            </div>
+
+            <h2 style="text-align:center;color:#b32d2e">❌ Reserva Cancelada</h2>
+
+            <p>Hola <strong>' . htmlspecialchars($nombreUsuario) . '</strong>,</p>
+            <p>Tu reserva fue cancelada correctamente.</p>
+
+            <div style="background:#fdeaea;padding:15px;border-radius:8px;margin:10px 0;">
+                <p><strong>ID Reserva:</strong> ' . intval($id_reserva) . '</p>
+                <p><strong>Actividad:</strong> ' . htmlspecialchars($actividad) . '</p>
+                <p><strong>Fecha programada:</strong> ' . htmlspecialchars($fecha_visita) . '</p>
+            </div>
+
+            <p>Si tienes dudas o deseas programar una nueva visita, estaremos encantados de ayudarte 💚</p>
+
+            <hr>
+            <p style="font-size:12px;text-align:center;color:#777">
+                © ' . date("Y") . ' Parque Las Heliconias - Mensaje automático
+            </p>
+        </div>
+    </div>';
+
+    return enviarCorreo($correoDestino, $nombreUsuario, $asunto, $mensajeHTML, true);
+}
+
 ?>

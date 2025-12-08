@@ -63,6 +63,21 @@ if ($codeUpdate === 200) {
         'tipo' => 'success',
         'mensaje' => '✅ ¡La reserva ha sido cancelada exitosamente!'
     ];
+    
+// ===== ENVIAR CORREO DE CANCELACIÓN =====
+include_once("../includes/enviarCorreo.php");
+
+// Obtener correo y nombre del usuario desde sesión
+$correoUsuario = $_SESSION["correo"];
+$nombreUsuario = $_SESSION["nombre"];
+
+// Obtener datos de actividad para el correo
+list($codeAct, $actData) = supabase_get("reservas?id_reserva=eq.$id_reserva&select=fecha_visita,actividad:actividades(nombre)");
+$actividad = $actData[0]["actividad"]["nombre"] ?? "Actividad";
+$fecha_visita = $actData[0]["fecha_visita"] ?? "";
+
+enviarCorreoCancelacion($correoUsuario, $nombreUsuario, $id_reserva, $actividad, $fecha_visita);
+
 } else {
     $_SESSION['toast'] = [
         'tipo' => 'error',

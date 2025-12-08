@@ -91,7 +91,29 @@ $participante = [
     "observaciones"        => $observaciones
 ];
 
+// Obtener nombre de la actividad desde Supabase
+list($codeAct, $actInfo) = supabase_get("actividades?id_actividad=eq.$id_actividad&select=nombre");
+
+$actividad_nombre = $actInfo[0]["nombre"] ?? "Actividad";
+
 list($codePart, $partData) = supabase_insert("participantes_reserva", $participante);
+
+// ===== ENVIAR CORREO DE CONFIRMACIÓN =====
+include_once("../includes/enviarCorreo.php");
+
+$correoUsuario = $_SESSION["correo"] ?? null;
+$nombreUsuario = $_SESSION["nombre"] ?? "Usuario";
+
+if ($correoUsuario) {
+    enviarCorreoReserva(
+        $correoUsuario,
+        $nombreUsuario,
+        $id_reserva,
+        $fecha_visita,
+        $actividad_nombre
+    );
+}
+
 
 // DEBUG opcional
 // var_dump($codePart, $partData); exit;
