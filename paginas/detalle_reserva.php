@@ -3,9 +3,9 @@ session_start();
 include('../includes/verificar_sesion.php');
 include('../includes/supabase.php');
 
-// ----------------------
-// ✔ Validar parámetro ID
-// ----------------------
+// ---------------------------
+// ✔ Validar ID de reserva
+// ---------------------------
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     echo "<script>
         alert('⚠️ Parámetro inválido.');
@@ -17,9 +17,9 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 $id_reserva = intval($_GET['id']);
 $id_usuario = $_SESSION['usuario_id'];
 
-// -----------------------------------------------------------
-// 🔍 CONSULTA PRINCIPAL DE LA RESERVA
-// -----------------------------------------------------------
+// ---------------------------
+// 🔍 Consultar reserva + actividad + institución
+// ---------------------------
 $endpoint =
     "reservas?"
     . "select=id_reserva,id_usuario,id_actividad,id_institucion,fecha_reserva,fecha_visita,estado,"
@@ -31,10 +31,9 @@ $endpoint =
 
 list($codeReserva, $dataReserva) = supabase_get($endpoint);
 
-// validar
 if ($codeReserva !== 200 || empty($dataReserva)) {
     echo "<script>
-        alert('⚠️ Reserva no encontrada o no pertenece al usuario.');
+        alert('⚠️ Reserva no encontrada.');
         window.location = 'mis_reservas.php';
     </script>";
     exit;
@@ -42,24 +41,26 @@ if ($codeReserva !== 200 || empty($dataReserva)) {
 
 $reserva = $dataReserva[0];
 
-// -----------------------------------------------------------
-// 🔍 CONSULTAR ASISTENCIA (si existe)
-// -----------------------------------------------------------
+// ---------------------------
+// 🔍 Consultar asistencia (si existe)
+// ---------------------------
 list($codeAsis, $asisData) =
     supabase_get("asistencia?id_reserva=eq.$id_reserva&select=*");
 
 $asistencia = (!empty($asisData)) ? $asisData[0] : null;
 
-// -----------------------------------------------------------
-// 🔍 CONSULTAR PARTICIPANTES
-// -----------------------------------------------------------
+// ---------------------------
+// 🔍 Consultar participantes
+// ---------------------------
 list($codePart, $participantes) =
     supabase_get("participantes_reserva?id_reserva=eq.$id_reserva&select=*");
 
-// -----------------------------------------------------------
-// 📅 Función día en español
-// -----------------------------------------------------------
+// ---------------------------
+// 📅 Función corregida
+// ---------------------------
 function diaEnEspanol($fecha) {
+    if (empty($fecha)) return "Fecha no disponible";
+
     $dias = [
         'Monday' => 'Lunes',
         'Tuesday' => 'Martes',
@@ -69,7 +70,9 @@ function diaEnEspanol($fecha) {
         'Saturday' => 'Sábado',
         'Sunday' => 'Domingo'
     ];
-    return $dias[date('l', strtotime($fecha))] ?? $fecha;
+
+    $ingles = date('l', strtotime($fecha));
+    return $dias[$ingles] ?? $ingles;
 }
 ?>
 <!DOCTYPE html>
@@ -78,10 +81,10 @@ function diaEnEspanol($fecha) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Detalle de Reserva - Parque de las Heliconias</title>
+
 <link rel="stylesheet" href="../assets/css/estilos.css">
 
 <style>
-<?php /* (Mantenemos tu CSS tal cual) */ ?>
 body {
   background: #f5f9f5;
   font-family: "Poppins", sans-serif;
@@ -116,7 +119,6 @@ h2.titulo-bienvenida {
   gap: 15px;
   margin-top: 10px;
 }
-.form-reserva label { font-weight: 600; color: #333; margin-bottom: 5px; }
 .form-reserva input {
   width: 100%; padding: 10px; border: 1.5px solid #4b8b3b;
   border-radius: 8px; background: #f8fff8;
@@ -142,6 +144,7 @@ h2.titulo-bienvenida {
 </head>
 
 <body>
+
 <?php include('../includes/header.php'); ?>
 
 <main class="contenedor-panel detalle-wrapper">
@@ -156,6 +159,7 @@ h2.titulo-bienvenida {
     <p><b>Actividad:</b> <?= htmlspecialchars($reserva["actividades"]["nombre"]) ?></p>
     <p><b>Descripción:</b> <?= htmlspecialchars($reserva["actividades"]["descripcion"]) ?></p>
     <p><b>Duración:</b> <?= $reserva["actividades"]["duracion_minutos"] ?> minutos</p>
+
     <p><b>Tipo de reserva:</b> <?= ucfirst($reserva["tipo_reserva"]) ?></p>
     <p><b>Participantes:</b> <?= $reserva["numero_participantes"] ?></p>
 
@@ -167,21 +171,32 @@ h2.titulo-bienvenida {
       </span>
     </p>
 
-    <p><b>Fecha Reserva:</b>
-      <?= date("d/m/Y H:i", strtotime($reserva["fecha_reserva"])) ?>
+    <!-- Fecha de reserva -->
+    <p><b>Fecha de reserva:</b>
+      <?php if (!empty($reserva["fecha_reserva"])): ?>
+          <?= date("d/m/Y H:i", strtotime($reserva["fecha_reserva"])) ?>
+      <?php else: ?>
+          <span style="color:#777">Sin registrar</span>
+      <?php endif; ?>
     </p>
 
+    <!-- Fecha de visita -->
     <p><b>📅 Día de visita:</b>
-      <?= diaEnEspanol($reserva["fecha_visita"]) ?>,
-      <?= date("d/m/Y", strtotime($reserva["fecha_visita"])) ?>
+      <?php if (!empty($reserva["fecha_visita"])): ?>
+          <?= diaEnEspanol($reserva["fecha_visita"]) ?>,
+          <?= date("d/m/Y", strtotime($reserva["fecha_visita"])) ?>
+      <?php else: ?>
+          <span style="color:#777">Sin fecha asignada</span>
+      <?php endif; ?>
     </p>
 
     <?php if (!empty($reserva["instituciones"]["nombre_institucion"])): ?>
       <p><b>Institución:</b> <?= $reserva["instituciones"]["nombre_institucion"] ?></p>
     <?php endif; ?>
+
   </section>
 
-  <!-- 🧾 Datos del Visitante (Asistencia) -->
+  <!-- 🧾 Datos del visitante (asistencia si existe) -->
   <?php if ($asistencia): ?>
   <section class="detalle-card">
     <h3>🧾 Datos del Visitante</h3>
@@ -189,23 +204,23 @@ h2.titulo-bienvenida {
     <div class="form-reserva">
       <div>
         <label>Tipo de documento:</label>
-        <input type="text" value="<?= $asistencia['tipo_documento'] ?>" readonly>
+        <input type="text" value="<?= htmlspecialchars($asistencia['tipo_documento']) ?>" readonly>
       </div>
 
       <div>
         <label>Número de identificación:</label>
-        <input type="text" value="<?= $asistencia['numero_identificacion'] ?>" readonly>
+        <input type="text" value="<?= htmlspecialchars($asistencia['numero_identificacion']) ?>" readonly>
       </div>
 
       <div>
         <label>Nacionalidad:</label>
-        <input type="text" value="<?= $asistencia['nacionalidad'] ?>" readonly>
+        <input type="text" value="<?= htmlspecialchars($asistencia['nacionalidad']) ?>" readonly>
       </div>
 
       <?php if (!empty($asistencia["nombre_grupo"])): ?>
       <div>
-        <label>Grupo / Centro educativo:</label>
-        <input type="text" value="<?= $asistencia['nombre_grupo'] ?>" readonly>
+        <label>Nombre del grupo:</label>
+        <input type="text" value="<?= htmlspecialchars($asistencia['nombre_grupo']) ?>" readonly>
       </div>
       <?php endif; ?>
     </div>
@@ -224,7 +239,7 @@ h2.titulo-bienvenida {
           </tr>
         </thead>
         <tbody>
-          <?php $i = 1; foreach ($participantes as $p): ?>
+          <?php $i=1; foreach ($participantes as $p): ?>
           <tr>
             <td><?= $i++ ?></td>
             <td><?= htmlspecialchars($p["nombre"]) ?></td>
@@ -238,7 +253,6 @@ h2.titulo-bienvenida {
   </section>
   <?php endif; ?>
 
-  <!-- BOTONES -->
   <div class="acciones-detalle">
     <a href="mis_reservas.php" class="boton-verde">← Volver</a>
 
