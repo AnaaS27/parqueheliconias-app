@@ -242,26 +242,31 @@ radios.forEach(radio => {
 
 form.addEventListener("submit", function (e) {
     const tipo = document.querySelector("input[name='tipo_reserva']:checked").value;
-    const cantidadInput = document.querySelector("input[name='cantidad']");
-    const cantidad = cantidadInput ? cantidadInput.value : "";
+    const cantidad = document.querySelector("input[name='cantidad']").value;
 
     mensaje.textContent = "";
 
     if (tipo === "grupal") {
-        if (cantidad === "" || cantidad < 2) {
+
+        if (!cantidad || cantidad < 2) {
             e.preventDefault();
             mensaje.textContent = "⚠️ Debes ingresar al menos 2 personas.";
             return;
         }
-        
-        // 👉 Enviar parámetros necesarios por GET
+
+        // 👉 MUY IMPORTANTE: USAR GET
+        form.method = "GET";
         form.action = "participantes_reserva.php?id_actividad=<?= $item['id_actividad'] ?>&cantidad=" + cantidad;
+
     } else {
+        // Individual usa POST
+        form.method = "POST";
         form.action = "fecha_reserva.php";
     }
 
     boton.classList.add("cargando");
 });
+
 </script>
 
 </body>
