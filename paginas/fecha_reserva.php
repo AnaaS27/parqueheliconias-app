@@ -17,7 +17,7 @@ if (!isset($_SESSION['usuario_id'])) {
 // -----------------------------------------------------
 // 🔒 Validar que llegue actividad_id por GET
 // -----------------------------------------------------
-$actividad_id = $_GET['actividad_id'] ?? null;
+$actividad_id = $_GET['id_actividad'] ?? null;
 $tipo = $_GET['tipo'] ?? 'individual';
 
 if (!$actividad_id) {
