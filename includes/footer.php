@@ -1,5 +1,5 @@
 <?php
-// Detectar ruta base solo si no existe
+// Solo calcular la ruta base si no existe
 if (!isset($rutaBase)) {
     $rutaBase = (strpos($_SERVER['PHP_SELF'], '/paginas/') !== false || strpos($_SERVER['PHP_SELF'], '/admin/') !== false)
         ? '../'
@@ -7,98 +7,70 @@ if (!isset($rutaBase)) {
 }
 ?>
 
-<!-- Tailwind -->
-<script src="https://cdn.tailwindcss.com"></script>
+<!-- Enlace al CSS del footer -->
+<link rel="stylesheet" href="<?= $rutaBase ?>assets\css\footer.css">
 
-<footer class="bg-[#2E7D32] text-white pt-16 pb-20 mt-20">
-
-    <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 px-6">
-
-        <!-- 🌿 LOGO CENTRAL -->
-        <div class="flex flex-col items-center">
-            <img src="<?= $rutaBase ?>assets/img/logoo.png"
-                 class="w-52 h-auto object-contain"
-                 alt="Logo Parque de las Heliconias">
-
-            <p class="text-[#F4C542] text-base font-semibold mt-4 uppercase tracking-wide text-center">
-                Parque de las Heliconias
-            </p>
-        </div>
-
-        <!-- 📍 UBICACIÓN -->
-        <div class="text-center md:text-left">
-            <h3 class="text-[#F4C542] font-bold text-xl mb-4 uppercase tracking-wide">Ubicación</h3>
-
-            <div class="flex md:flex-row flex-col items-center md:items-start gap-3">
-                <img src="<?= $rutaBase ?>assets/img/ubicacion.png" class="w-6 h-6">
-
-                <p class="leading-tight">
+<footer class="footer">
+    <div class="footer-container">
+        
+        <!-- 🗺️ Columna 1 - Ubicación -->
+        <div class="footer-section ubicacion">
+            <img src="<?= $rutaBase ?>assets/img/logoo.png" alt="Logo Parque de las Heliconias" class="footer-logo">
+            <h3>Ubicación</h3>
+            <a href="https://maps.app.goo.gl/h5fW21CPUkmmKE8Q9" target="_blank" class="ubicacion-link">
+                <img src="<?= $rutaBase ?>assets/img/ubicacion.png" alt="Ubicación" class="social-icon">
+                <span>
                     Parque de las Heliconias<br>
-                    Kilómetro 7 Vía Sevilla – Caicedonia<br>
+                    Kilómetro 7 Vía Sevilla - Caicedonia<br>
                     Valle del Cauca, Colombia
-                </p>
-            </div>
+                </span>
+            </a>
         </div>
 
-        <!-- ⏰ HORARIOS -->
-        <div class="text-center md:text-left">
-            <h3 class="text-[#F4C542] font-bold text-xl mb-4 uppercase tracking-wide">Horarios</h3>
-
-            <p class="leading-tight">
-                <span class="font-bold">Instituciones Educativas:</span><br>
-                Lunes a Domingo<br>
-                8:00 a.m. – 5:00 p.m.
-            </p>
-
-            <p class="mt-4 leading-tight">
-                <span class="font-bold">Público General:</span><br>
-                Miércoles a Domingo y Festivos<br>
-                8:00 a.m. – 5:00 p.m.
-            </p>
+        <!-- ⏰ Columna 2 - Horarios -->
+        <div class="footer-section">
+            <h3>Horarios Disponibles</h3>
+            <p><strong>Instituciones Educativas:</strong><br>
+            Lunes a Domingo<br>
+            8:00 a.m. – 5:00 p.m.</p>
+            <p><strong>Público General:</strong><br>
+            Miércoles a Domingo y Festivos<br>
+            8:00 a.m. – 5:00 p.m.</p>
         </div>
 
-        <!-- ☎ CONTACTO + REDES -->
-        <div class="text-center md:text-left">
-            <h3 class="text-[#F4C542] font-bold text-xl mb-4 uppercase tracking-wide">Contáctanos</h3>
-
-            <!-- WhatsApp -->
-            <div class="flex items-center justify-center md:justify-start gap-3 mb-3">
-                <img src="<?= $rutaBase ?>assets/img/whatsapp.png" class="w-6 h-6">
+        <!-- ☎️ Columna 3 - Contáctanos -->
+        <div class="footer-section contacto">
+            <h3>Contáctanos</h3>
+            <a href="https://wa.me/573173034970?text=¡Hola!%20Estoy%20interesado(a)%20en%20visitar%20el%20Parque%20de%20las%20Heliconias.%20¿Podrían%20darme%20más%20información?" 
+               target="_blank" class="whatsapp-link">
+                <img src="<?= $rutaBase ?>assets/img/whatsapp.png" alt="WhatsApp" class="social-icon">
                 <span>+57 3176528946</span>
-            </div>
+            </a>
 
-            <!-- Correo -->
-            <div class="flex items-center justify-center md:justify-start gap-3">
-                <img src="<?= $rutaBase ?>assets/img/correo.png" class="w-6 h-6">
+            <a href="mailto:cea-heliconias@cvc.gov.co" class="correo-link">
+               <img src="<?= $rutaBase ?>assets/img/correo.png" alt="Correo" class="social-icon">
                 <span>cea-heliconias@cvc.gov.co</span>
-            </div>
+            </a> 
+        </div>
 
-            <h3 class="text-[#F4C542] font-bold text-lg mt-6 mb-3 uppercase tracking-wide">Síguenos</h3>
-
-            <!-- Redes Sociales – IGUALES EN ALTO/ANCHO -->
-            <div class="flex gap-6 justify-center md:justify-start">
-
-                <!-- Instagram -->
-                <div class="w-10 h-10 flex items-center justify-center">
-                    <img src="<?= $rutaBase ?>assets/img/instagram.png"
-                         class="max-w-full max-h-full object-contain hover:scale-110 transition">
-                </div>
-
-                <!-- Facebook -->
-                <div class="w-10 h-10 flex items-center justify-center">
-                    <img src="<?= $rutaBase ?>assets/img/facebook.png"
-                         class="max-w-full max-h-full object-contain hover:scale-110 transition">
-                </div>
-
+        <!-- 📱 Columna 4 - Redes sociales -->
+        <div class="footer-section redes">
+            <h3>Síguenos en redes sociales</h3>
+            <div class="social-icons">
+                <a href="https://www.instagram.com/parquedelasheliconias/?hl=es" target="_blank">
+                    <img src="<?= $rutaBase ?>assets/img/instagram.png" alt="Instagram" class="social-icon">
+                </a>
+                <a href="https://www.facebook.com/ParqueHeliconias/" target="_blank">
+                    <img src="<?= $rutaBase ?>assets/img/facebook.png" alt="Facebook" class="social-icon">
+                </a>
             </div>
         </div>
 
     </div>
 
-    <!-- BOTÓN FLOTANTE -->
-    <a href="https://wa.me/573173034970?text=Hola!%20Quiero%20más%20información%20sobre%20el%20Parque."
-       class="fixed bottom-6 right-6 bg-red-600 text-white py-3 px-6 rounded-full shadow-xl hover:bg-red-700 transition flex items-center gap-2 z-50">
+    <!-- Botón flotante de WhatsApp -->
+    <a href="https://wa.me/573173034970?text=¡Hola!%20Quiero%20más%20información%20sobre%20el%20Parque%20de%20las%20Heliconias." 
+       class="chat-btn" target="_blank">
        💬 ¡Vamos a chatear!
     </a>
-
 </footer>
