@@ -16,43 +16,37 @@ $offset = ($paginaActual - 1) * $registrosPorPagina;
 $filtro   = $_GET['filtro']  ?? 'activos';
 $busqueda = trim($_GET['buscar'] ?? '');
 
-$where = [];
+$filtrosQuery = "";
 
 // Estado
 if ($filtro === 'activos') {
-    $where[] = "usuario_activo=eq.true";
+    $filtrosQuery .= "&usuario_activo=eq.true";
 } elseif ($filtro === 'inactivos') {
-    $where[] = "usuario_activo=eq.false";
+    $filtrosQuery .= "&usuario_activo=eq.false";
 }
 
 // Búsqueda
 if ($busqueda !== "") {
-    $texto = urlencode("%$busqueda%");
-    $where[] = "(nombre=ilike.$texto,correo=ilike.$texto)";
-}
-
-// Convertir condiciones a formato Supabase
-$filtrosQuery = "";
-if (!empty($where)) {
-    foreach ($where as $cond) {
-        $filtrosQuery .= "&" . $cond;
-    }
+    $texto = strtolower($busqueda);
+    // OR REAL de Supabase
+    $filtrosQuery .= "&or=(nombre.ilike.%$texto%,correo.ilike.%$texto%)";
 }
 
 // =====================================
-// 📌 OBTENER LISTA DE USUARIOS LIMITADA (PÁGINA)
+// 📌 OBTENER LISTA DE USUARIOS PAGINADOS
 // =====================================
-$endpoint = "usuarios?select=*&order=id_usuario.asc&limit=$registrosPorPagina&offset=$offset" . $filtrosQuery;
+$endpoint =
+    "usuarios?select=*&order=id_usuario.asc&limit=$registrosPorPagina&offset=$offset" .
+    $filtrosQuery;
 
 list($codeUsers, $usuarios) = supabase_get($endpoint);
 
-if ($codeUsers !== 200) {
+if ($codeUsers !== 200 || !is_array($usuarios)) {
     $usuarios = [];
 }
 
 // =====================================
-// 📌 CONTAR TOTAL DE REGISTROS FILTRADOS
-// Supabase: select=count:id
+// 📌 CONTAR TOTAL REGISTROS
 // =====================================
 $countEndpoint = "usuarios?select=count:id" . $filtrosQuery;
 
