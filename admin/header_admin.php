@@ -3,8 +3,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-include('../includes/verificar_admin.php'); 
-require_once('../includes/supabase.php'); // ← reemplaza conexion.php por supabase.php
+require_once '../includes/verificar_admin.php';
+require_once '../includes/supabase.php'; // 👈 IMPORTANTE: require_once
+
 
 // ===============================
 // 1️⃣ OBTENER ID ADMIN DESDE SESIÓN

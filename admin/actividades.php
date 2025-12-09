@@ -1,6 +1,6 @@
 <?php
 include('header_admin.php');
-include('../includes/supabase.php'); // <-- Ahora usamos Supabase
+require_once '../includes/supabase.php'; // <-- Ahora usamos Supabase
 ?>
 
 <section class="admin-actividades">
