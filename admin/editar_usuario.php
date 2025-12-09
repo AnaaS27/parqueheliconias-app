@@ -14,9 +14,9 @@ if (!isset($_GET['id'])) {
 $id_usuario = intval($_GET['id']);
 
 // =============================
-// 1️⃣ OBTENER USUARIO
+// 1️⃣ OBTENER USUARIO DESDE SUPABASE
 // =============================
-$endpointUser = "usuarios?id_usuario=eq.$id_usuario&select=*";
+$endpointUser = "usuarios?select=*&id_usuario=eq.$id_usuario";
 list($codeUser, $userData) = supabase_get($endpointUser);
 
 if ($codeUser !== 200 || empty($userData)) {
@@ -27,13 +27,14 @@ if ($codeUser !== 200 || empty($userData)) {
 $usuario = $userData[0];
 
 // =============================
-// 2️⃣ DEFINIR PAÍS SEGÚN SU CIUDAD
+// 2️⃣ OBTENER PAÍS SEGÚN SU CIUDAD
 // =============================
 $id_ciudad_usuario = $usuario["id_ciudad"] ?? null;
 $id_pais = 1;
 
 if ($id_ciudad_usuario) {
-    $endpointCiudad = "ciudades?id=eq.$id_ciudad_usuario&select=pais_id";
+
+    $endpointCiudad = "ciudades?select=pais_id&id=eq.$id_ciudad_usuario";
     list($codeCiudad, $ciudadData) = supabase_get($endpointCiudad);
 
     if ($codeCiudad === 200 && !empty($ciudadData)) {
@@ -42,13 +43,24 @@ if ($id_ciudad_usuario) {
 }
 
 // =============================
-// 3️⃣ LISTAS DESDE SUPABASE
+// 3️⃣ CARGAR LISTAS DESDE SUPABASE
 // =============================
-list($codeRoles, $roles) = supabase_get("roles?select=*");
-list($codeInst, $instituciones) = supabase_get("instituciones?select=*");
-list($codeGen, $generos) = supabase_get("genero?select=*");
-list($codePaises, $paises) = supabase_get("pais?select=*");
-list($codeCiu, $ciudades) = supabase_get("ciudades?pais_id=eq.$id_pais&select=*");
+
+list($codeRoles, $roles) =
+    supabase_get("roles?select=id_rol,nombre&order=id_rol.asc");
+
+list($codeInst, $instituciones) =
+    supabase_get("instituciones?select=id_institucion,nombre_institucion&order=nombre_institucion.asc");
+
+list($codeGen, $generos) =
+    supabase_get("genero?select=id_genero,genero&order=genero.asc");
+
+list($codePaises, $paises) =
+    supabase_get("pais?select=id,pais&order=pais.asc");
+
+list($codeCiu, $ciudades) =
+    supabase_get("ciudades?select=id,nombre&pais_id=eq.$id_pais&order=nombre.asc");
+
 ?>
 
 <div class="max-w-5xl mx-auto p-6">
@@ -69,51 +81,66 @@ list($codeCiu, $ciudades) = supabase_get("ciudades?pais_id=eq.$id_pais&select=*"
                 <!-- NOMBRE -->
                 <div>
                     <label>Nombre</label>
-                    <input type="text" name="nombre" value="<?= htmlspecialchars($usuario['nombre']) ?>" required class="input">
+                    <input type="text" name="nombre"
+                           value="<?= htmlspecialchars($usuario['nombre']) ?>"
+                           required class="input">
                 </div>
 
                 <!-- APELLIDO -->
                 <div>
                     <label>Apellido</label>
-                    <input type="text" name="apellido" value="<?= htmlspecialchars($usuario['apellido']) ?>" required class="input">
+                    <input type="text" name="apellido"
+                           value="<?= htmlspecialchars($usuario['apellido']) ?>"
+                           required class="input">
                 </div>
 
                 <!-- CORREO -->
                 <div>
                     <label>Correo</label>
-                    <input type="email" name="correo" value="<?= htmlspecialchars($usuario['correo']) ?>" required class="input">
+                    <input type="email" name="correo"
+                           value="<?= htmlspecialchars($usuario['correo']) ?>"
+                           required class="input">
                 </div>
 
                 <!-- DOCUMENTO -->
                 <div>
                     <label>Documento</label>
-                    <input type="text" name="documento" value="<?= htmlspecialchars($usuario['documento']) ?>" required class="input">
+                    <input type="text" name="documento"
+                           value="<?= htmlspecialchars($usuario['documento']) ?>"
+                           required class="input">
                 </div>
 
                 <!-- TELÉFONO -->
                 <div>
                     <label>Teléfono</label>
-                    <input type="text" name="telefono" value="<?= htmlspecialchars($usuario['telefono']) ?>" class="input">
+                    <input type="text" name="telefono"
+                           value="<?= htmlspecialchars($usuario['telefono']) ?>"
+                           class="input">
                 </div>
 
                 <!-- FECHA NACIMIENTO -->
                 <div>
                     <label>Fecha nacimiento</label>
-                    <input type="date" name="fecha_nacimiento" value="<?= $usuario['fecha_nacimiento'] ?>" class="input">
+                    <input type="date" name="fecha_nacimiento"
+                           value="<?= $usuario['fecha_nacimiento'] ?>"
+                           class="input">
                 </div>
 
                 <!-- CONTRASEÑA -->
                 <div>
                     <label>Nueva contraseña</label>
-                    <input type="password" name="contrasena" placeholder="Dejar vacío para NO cambiarla" class="input">
+                    <input type="password" name="contrasena"
+                           placeholder="Dejar vacío para NO cambiarla"
+                           class="input">
                 </div>
 
-                <!-- GENERO -->
+                <!-- GÉNERO -->
                 <div>
                     <label>Género</label>
                     <select name="id_genero" class="input">
                         <?php foreach ($generos as $g): ?>
-                            <option value="<?= $g['id_genero'] ?>" <?= $usuario['id_genero'] == $g['id_genero'] ? 'selected' : '' ?>>
+                            <option value="<?= $g['id_genero'] ?>"
+                                <?= $usuario['id_genero'] == $g['id_genero'] ? 'selected' : '' ?>>
                                 <?= $g['genero'] ?>
                             </option>
                         <?php endforeach; ?>
@@ -125,7 +152,8 @@ list($codeCiu, $ciudades) = supabase_get("ciudades?pais_id=eq.$id_pais&select=*"
                     <label>Rol</label>
                     <select name="id_rol" class="input">
                         <?php foreach ($roles as $r): ?>
-                            <option value="<?= $r['id_rol'] ?>" <?= $usuario['id_rol'] == $r['id_rol'] ? 'selected' : '' ?>>
+                            <option value="<?= $r['id_rol'] ?>"
+                                <?= $usuario['id_rol'] == $r['id_rol'] ? 'selected' : '' ?>>
                                 <?= $r['nombre'] ?>
                             </option>
                         <?php endforeach; ?>
@@ -137,19 +165,21 @@ list($codeCiu, $ciudades) = supabase_get("ciudades?pais_id=eq.$id_pais&select=*"
                     <label>Institución</label>
                     <select name="id_institucion" class="input">
                         <?php foreach ($instituciones as $inst): ?>
-                            <option value="<?= $inst['id_institucion'] ?>" <?= $usuario['id_institucion'] == $inst['id_institucion'] ? 'selected' : '' ?>>
+                            <option value="<?= $inst['id_institucion'] ?>"
+                                <?= $usuario['id_institucion'] == $inst['id_institucion'] ? 'selected' : '' ?>>
                                 <?= $inst['nombre_institucion'] ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
 
-                <!-- PAIS -->
+                <!-- PAÍS -->
                 <div>
                     <label>País</label>
                     <select name="pais" onchange="cargarCiudades(this.value)" class="input">
                         <?php foreach ($paises as $p): ?>
-                            <option value="<?= $p['id'] ?>" <?= $id_pais == $p['id'] ? 'selected' : '' ?>>
+                            <option value="<?= $p['id'] ?>"
+                                <?= $id_pais == $p['id'] ? 'selected' : '' ?>>
                                 <?= $p['pais'] ?>
                             </option>
                         <?php endforeach; ?>
@@ -161,7 +191,8 @@ list($codeCiu, $ciudades) = supabase_get("ciudades?pais_id=eq.$id_pais&select=*"
                     <label>Ciudad</label>
                     <select name="id_ciudad" id="select-ciudad" class="input">
                         <?php foreach ($ciudades as $c): ?>
-                            <option value="<?= $c['id'] ?>" <?= $usuario['id_ciudad'] == $c['id'] ? 'selected' : '' ?>>
+                            <option value="<?= $c['id'] ?>"
+                                <?= $usuario['id_ciudad'] == $c['id'] ? 'selected' : '' ?>>
                                 <?= $c['nombre'] ?>
                             </option>
                         <?php endforeach; ?>
@@ -180,7 +211,9 @@ list($codeCiu, $ciudades) = supabase_get("ciudades?pais_id=eq.$id_pais&select=*"
             </div>
 
             <div class="text-right">
-                <button class="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700">Guardar cambios</button>
+                <button class="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700">
+                    Guardar cambios
+                </button>
             </div>
 
         </form>
