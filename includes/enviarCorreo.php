@@ -16,8 +16,8 @@ function smtpConfig(PHPMailer $mail)
     $mail->SMTPAuth = true;
     $mail->Username = "parqueheliconias0@gmail.com";
     $mail->Password = "xgrw xzsu uati hwfk"; 
-    $mail->SMTPSecure = "tls";
-    $mail->Port = 587;
+    $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+    $mail->Port = 465;
 
     $mail->setFrom("parqueheliconias0@gmail.com", "Parque Las Heliconias");
 
