@@ -14,12 +14,12 @@ function smtpConfig(PHPMailer $mail)
     $mail->isSMTP();
     $mail->Host = "smtp.gmail.com";
     $mail->SMTPAuth = true;
-    $mail->Username = "pruebaheliconas@gmail.com";
-    $mail->Password = "wuwa asyl thes woxw"; 
+    $mail->Username = "parqueheliconias0@gmail.com";
+    $mail->Password = "xgrw xzsu uati hwfk"; 
     $mail->SMTPSecure = "tls";
     $mail->Port = 587;
 
-    $mail->setFrom("pruebaheliconas@gmail.com", "Parque Las Heliconias");
+    $mail->setFrom("parqueheliconias0@gmail.com", "Parque Las Heliconias");
 
     // 🔤 Soporte para tildes y caracteres especiales
     $mail->CharSet  = 'UTF-8';
