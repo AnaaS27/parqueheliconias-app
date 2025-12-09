@@ -16,60 +16,29 @@ if (!$supabase_url || !$supabase_key) {
 /* ===============================
    SELECT (GET)
    =============================== */
-function supabase_get($endpoint, $limit = 10, $offset = 0) {
+function supabase_get($endpoint) {
     global $supabase_url, $supabase_key;
 
     $url = $supabase_url . "/rest/v1/" . $endpoint;
 
-    // Calcular rangos
-    $start = $offset;
-    $end = $offset + $limit - 1;
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 
-    $headers = [
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "apikey: $supabase_key",
         "Authorization: Bearer $supabase_key",
         "Accept: application/json",
-        "Prefer: count=exact",
-        "Range: $start-$end",
-        "Range-Unit: items"
-    ];
-
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        "Prefer: count=exact",     // <-- NECESARIO para paginar
+        "Range-Unit: items"       // <-- NECESARIO para que offset funcione
+    ]);
 
     $response = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-    // Supabase devuelve el total en el header Content-Range
-    $headers_info = [];
-    $header_size = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-    $header_text = substr($response, 0, $header_size);
-
-    foreach (explode("\r\n", $header_text) as $header_line) {
-        if (stripos($header_line, "content-range:") === 0) {
-            $headers_info["content-range"] = trim(substr($header_line, 15));
-        }
-    }
-
     curl_close($ch);
 
-    // Extraer total de la BD
-    $total = null;
-    if (!empty($headers_info["content-range"])) {
-        // Ejemplo: "0-9/57"
-        $parts = explode("/", $headers_info["content-range"]);
-        if (count($parts) === 2) {
-            $total = intval($parts[1]);
-        }
-    }
-
-    // El cuerpo es solo JSON (sin headers)
-    $json = json_decode($response, true);
-
-    return [$code, $json, $total];
+    return [$code, json_decode($response, true)];
 }
-
 
 
 /* ===============================
