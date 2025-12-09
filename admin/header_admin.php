@@ -2,27 +2,36 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-include('../includes/verificar_admin.php');
-include('../includes/conexion.php');
 
-// 🔹 Obtener ID del administrador desde sesión (mejor práctica)
+include('../includes/verificar_admin.php'); 
+include('../includes/supabase.php'); // ← reemplaza conexion.php por supabase.php
+
+// ===============================
+// 1️⃣ OBTENER ID ADMIN DESDE SESIÓN
+// ===============================
 $id_admin = $_SESSION['usuario_id'] ?? null;
 
-// Seguridad: si no existe, salir
 if (!$id_admin) {
     header("Location: ../login.php");
     exit;
 }
 
-// 🔔 Consultar cantidad de notificaciones nuevas (no leídas)
-$sql_noti = "SELECT COUNT(*) AS total FROM notificaciones WHERE id_usuario = $1 AND leida = FALSE";
-$res_noti = pg_query_params($conn, $sql_noti, [$id_admin]);
+// ===============================
+// 2️⃣ CONSULTAR NOTIFICACIONES NO LEÍDAS EN SUPABASE
+// ===============================
+//
+// Endpoint:
+// notificaciones?id_usuario=eq.{id}&leida=eq.false&select=count(id)
+//
+list($codeNoti, $notiData) = supabase_get(
+    "notificaciones?id_usuario=eq.$id_admin&leida=eq.false&select=count:id"
+);
 
-if ($res_noti && pg_num_rows($res_noti) > 0) {
-    $row = pg_fetch_assoc($res_noti);
-    $notiAdminCount = $row['total'];
-} else {
-    $notiAdminCount = 0;
+$notiAdminCount = 0;
+
+if ($codeNoti === 200 && !empty($notiData)) {
+    // Supabase devuelve count como string → convertirlo
+    $notiAdminCount = intval($notiData[0]["count"]);
 }
 ?>
 <!DOCTYPE html>
@@ -78,13 +87,15 @@ if ($res_noti && pg_num_rows($res_noti) > 0) {
         <li><a href="usuarios.php">👥 Usuarios</a></li>
         <li><a href="reportes.php">📊 Reportes</a></li>
 
-        <!-- 🔔 Notificaciones del administrador -->
+        <!-- 🔔 Notificaciones -->
         <li>
           <a href="notificaciones_admin.php" class="noti-admin-link" title="Ver notificaciones">
             <img src="../assets/img/bell.svg" alt="Notificaciones" class="icono-notificacion">
+
             <?php if ($notiAdminCount > 0): ?>
               <span class="badge"><?= $notiAdminCount ?></span>
             <?php endif; ?>
+
           </a>
         </li>
 
