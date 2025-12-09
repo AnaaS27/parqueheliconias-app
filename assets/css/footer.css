@@ -147,6 +147,7 @@
     flex-direction: column;
     align-items: center; /* Centra el logo y su bloque */
     text-align: center;  /* Centra el texto */
+    justify-content: center;
 }
 
 /* Ajusta el tamaño del logo si deseas */
