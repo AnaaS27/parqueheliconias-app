@@ -2,7 +2,7 @@
 session_start();
 include('../includes/verificar_sesion.php');
 include('../includes/supabase.php');
-include_once('../includes/enviarCorreo.php');
+include_once('../includes/email_api.php');
 
 // ===============================
 //  🔐 VALIDAR SESIÓN
