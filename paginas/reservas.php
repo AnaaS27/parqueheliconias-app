@@ -99,7 +99,7 @@ $actividad_nombre = $actInfo[0]["nombre"] ?? "Actividad";
 list($codePart, $partData) = supabase_insert("participantes_reserva", $participante);
 
 // ===== ENVIAR CORREO DE CONFIRMACIÓN =====
-include_once("../includes/enviarCorreo.php");
+include_once("../includes/email_api.php");
 
 $correoUsuario = $_SESSION["correo"] ?? null;
 $nombreUsuario = $_SESSION["nombre"] ?? "Usuario";
@@ -113,6 +113,19 @@ if ($correoUsuario) {
         $actividad_nombre
     );
 }
+
+// Crear notificación interna en Supabase
+$notificacion = [
+    "id_usuario"    => $id_usuario,
+    "id_reserva"    => $id_reserva,
+    "titulo"        => "🌿 Reserva Registrada",
+    "mensaje"       => "Tu reserva para la actividad $actividad_nombre fue registrada correctamente.",
+    "tipo"          => "exito",
+    "fecha_creacion"=> date("Y-m-d H:i:s"),
+    "leida"         => false
+];
+
+supabase_insert("notificaciones", $notificacion);
 
 
 // DEBUG opcional

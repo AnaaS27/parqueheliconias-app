@@ -12,7 +12,7 @@
 /* 🟢 GRID PRINCIPAL DEL FOOTER */
 .footer-container {
     display: grid;
-    grid-template-columns: 1.3fr 1fr 1fr 1fr;
+    grid-template-columns: 1.2fr 1fr 1fr 1fr;
     gap: 40px;
     align-items: start;
     max-width: 1400px;
@@ -31,55 +31,52 @@
     text-transform: uppercase;
 }
 
-/* ==============================================
-   🟢 COLUMNA 1 — LOGO + UBICACIÓN
-   ============================================== */
+.footer-section p {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* =====================================================
+   ⭐ COLUMNA 1 — LOGO SOLO (SIN TEXTO)
+   ===================================================== */
 .logo-col {
     text-align: center;
 }
 
-.footer-logo {
-    width: 150px;
-    margin: 0 auto 15px;
+.footer-logo-grande {
+    width: 180px; /* Ajusta tamaño del logo */
+    margin: 0 auto;
+    display: block;
 }
 
-.ubicacion-box {
-    margin-top: 10px;
-}
-
+/* =====================================================
+   ⭐ COLUMNA UBICACIÓN — TEXTO SEPARADO DEL LOGO
+   ===================================================== */
 .ubicacion-link {
     display: flex;
     align-items: center;
     gap: 12px;
     color: white;
     text-decoration: none;
+    line-height: 1.4;
 }
 
 .ubicacion-link:hover {
     color: #25d366;
 }
 
-.icon-sm {
-    width: 22px;
+.icono-ubicacion {
+    width: 25px;
     height: auto;
 }
 
-.ubicacion-link span {
+.texto-ubicacion {
     display: block;
-    line-height: 1.4;
 }
 
-/* ==============================================
-   ⏰ COLUMNA 2 — HORARIOS
-   ============================================== */
-.footer-section p {
-    font-size: 14px;
-    line-height: 1.6;
-}
-
-/* ==============================================
-   ☎️ COLUMNA 3 — CONTACTO
-   ============================================== */
+/* =====================================================
+   ⭐ COLUMNA CONTACTO
+   ===================================================== */
 
 .footer-link {
     display: flex;
@@ -96,21 +93,24 @@
 }
 
 .footer-link img {
-    width: 25px;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
 }
 
-/* ==============================================
-   📱 COLUMNA 4 — REDES SOCIALES
-   ============================================== */
+/* =====================================================
+   ⭐ COLUMNA REDES SOCIALES
+   ===================================================== */
 
 .redes-box {
     display: flex;
-    gap: 15px;
+    gap: 18px;
     margin-top: 10px;
 }
 
 .icon-md {
     width: 36px;
+    height: 36px;
     transition: transform 0.3s ease;
 }
 
@@ -118,9 +118,10 @@
     transform: scale(1.15);
 }
 
-/* ==============================================
-   BOTÓN FLOTANTE WHATSAPP
-   ============================================== */
+/* =====================================================
+   ⭐ BOTÓN FLOTANTE WHATSAPP
+   ===================================================== */
+
 .chat-btn {
     position: fixed;
     bottom: 20px;
@@ -132,13 +133,17 @@
     font-weight: bold;
     text-decoration: none;
     box-shadow: 0px 4px 6px rgba(0,0,0,0.3);
+    z-index: 999;
 }
 
 .chat-btn:hover {
     background-color: #e6b800;
 }
 
-/* 🌐 RESPONSIVE */
+/* =====================================================
+   🌐 RESPONSIVE
+   ===================================================== */
+
 @media (max-width: 992px) {
     .footer-container {
         grid-template-columns: 1fr 1fr;
@@ -153,15 +158,28 @@
     .ubicacion-link {
         justify-content: center;
     }
+
+    .footer-link {
+        justify-content: center;
+    }
+
+    .redes-box {
+        justify-content: center;
+    }
 }
 
 @media (max-width: 600px) {
     .footer-container {
         grid-template-columns: 1fr;
         text-align: center;
+        gap: 20px;
     }
 
     .footer-link {
+        justify-content: center;
+    }
+
+    .ubicacion-link {
         justify-content: center;
     }
 
