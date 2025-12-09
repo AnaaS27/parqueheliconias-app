@@ -30,6 +30,7 @@ function supabase_post($endpoint, $data) {
     return [$status, json_decode($response, true)];
 }
 
+
 // ================================
 // 🔄 PROCESAR PETICIÓN AJAX
 // ================================
@@ -50,9 +51,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
         exit;
     }
 
-    // ================================
-    // 🔍 Verificar si el correo existe
-    // ================================
+    // 🔍 Verificar si correo existe
     $query = "usuarios?correo=eq." . urlencode($correo);
     $query = str_replace("+", "%20", $query);
 
@@ -71,14 +70,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
         exit;
     }
 
-    // ================================
-    // 🔐 Encriptar contraseña
-    // ================================
+    // 🔐 Hash contraseña
     $hash = password_hash($password, PASSWORD_BCRYPT);
 
-    // ================================
     // ➕ Insertar usuario
-    // ================================
     [$status, $insert] = supabase_post("usuarios", [
         "nombre"        => $nombre,
         "apellido"      => $apellido,
@@ -94,12 +89,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
         "fecha_registro"=> date("c")
     ]);
 
-    if ($status === 201) {
-        echo json_encode(["ok" => true, "msg" => "Registro exitoso."]);
-    } else {
-        echo json_encode(["ok" => false, "msg" => "Error registrando usuario."]);
-    }
-
+    echo json_encode([
+        "ok"  => $status === 201,
+        "msg" => $status === 201 ? "Registro exitoso." : "Error registrando usuario."
+    ]);
     exit;
 }
 ?>
@@ -109,20 +102,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
 <head>
     <meta charset="UTF-8">
     <title>Registrarse - Parque Las Heliconias</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" href="../assets/img/logoo.png">
+
+    <!-- TAILWIND CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="bg-green-50 min-h-screen flex items-center justify-center p-4">
 
-<!-- 🟢 Notificación flotante -->
-<div id="toast" class="fixed top-5 right-5 z-50 hidden"></div>
+<!-- 🟢 Toast → Notificación -->
+<div id="toast" class="fixed top-5 right-5 z-50 hidden px-4 py-3 rounded-lg shadow-lg text-white"></div>
 
 <!-- 🟢 Tarjeta de registro -->
-<div class="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-2xl">
+<div class="bg-white shadow-2xl rounded-2xl p-10 w-full max-w-2xl border border-green-200">
 
-    <h2 class="text-3xl font-bold text-center text-green-700 mb-6">
+    <h2 class="text-3xl font-bold text-center text-green-700 mb-8">
         🌿 Crear Cuenta
     </h2>
 
@@ -131,102 +127,105 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
         <!-- Nombre / Apellido -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label class="label">Nombre</label>
-                <input type="text" name="nombre" required class="input-box">
+                <label class="text-gray-700 font-medium">Nombre *</label>
+                <input type="text" name="nombre" required
+                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
             </div>
 
             <div>
-                <label class="label">Apellido</label>
-                <input type="text" name="apellido" required class="input-box">
+                <label class="text-gray-700 font-medium">Apellido *</label>
+                <input type="text" name="apellido" required
+                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
             </div>
         </div>
 
         <!-- Documento -->
         <div>
-            <label class="label">Documento de identidad</label>
-            <input type="number" name="documento" required class="input-box">
+            <label class="text-gray-700 font-medium">Documento de identidad *</label>
+            <input type="number" name="documento" required
+                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
         </div>
 
         <!-- Email -->
         <div>
-            <label class="label">Correo electrónico</label>
-            <input type="email" name="correo" required class="input-box">
+            <label class="text-gray-700 font-medium">Correo electrónico *</label>
+            <input type="email" name="correo" required
+                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
         </div>
 
         <!-- Teléfono -->
         <div>
-            <label class="label">Teléfono (opcional)</label>
-            <input type="tel" name="telefono" class="input-box">
+            <label class="text-gray-700 font-medium">Teléfono (opcional)</label>
+            <input type="tel" name="telefono"
+                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
         </div>
 
         <!-- Fecha Nacimiento -->
         <div>
-            <label class="label">Fecha de nacimiento</label>
-            <input type="date" name="fecha_nacimiento" required class="input-box">
+            <label class="text-gray-700 font-medium">Fecha de nacimiento *</label>
+            <input type="date" name="fecha_nacimiento" required
+                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
         </div>
 
         <!-- Género / Ciudad -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label class="label">Género</label>
-                <select name="genero" required class="input-box">
+                <label class="text-gray-700 font-medium">Género *</label>
+                <select name="genero" required
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
                     <option value="">Seleccione</option>
-                    <option value="Femenino">Femenino</option>
-                    <option value="Masculino">Masculino</option>
-                    <option value="Otro">Otro</option>
+                    <option>Femenino</option>
+                    <option>Masculino</option>
+                    <option>Otro</option>
                 </select>
             </div>
 
             <div>
-                <label class="label">Ciudad</label>
-                <select name="ciudad" required class="input-box">
+                <label class="text-gray-700 font-medium">Ciudad *</label>
+                <select name="ciudad" required
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
                     <option value="">Seleccione</option>
-                    <option value="Pereira">Pereira</option>
-                    <option value="Dosquebradas">Dosquebradas</option>
-                    <option value="Manizales">Manizales</option>
+                    <option>Pereira</option>
+                    <option>Dosquebradas</option>
+                    <option>Manizales</option>
                 </select>
             </div>
         </div>
 
         <!-- Contraseña -->
         <div>
-            <label class="label">Contraseña</label>
-            <input type="password" name="password" required minlength="6" class="input-box">
+            <label class="text-gray-700 font-medium">Contraseña *</label>
+            <input type="password" name="password" minlength="6" required
+                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
         </div>
 
         <!-- Confirmar contraseña -->
         <div>
-            <label class="label">Confirmar contraseña</label>
-            <input type="password" name="confirmPassword" required minlength="6" class="input-box">
+            <label class="text-gray-700 font-medium">Confirmar contraseña *</label>
+            <input type="password" name="confirmPassword" minlength="6" required
+                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
         </div>
 
         <!-- Botón -->
         <button type="submit"
-            id="registerBtn"
-            class="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
-            
+                id="registerBtn"
+                class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2">
+
             <span>Registrarme</span>
+
             <div id="loadingSpinner"
-                 class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                 class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin">
+            </div>
         </button>
 
         <p class="text-center text-gray-600 text-sm mt-3">
             ¿Ya tienes cuenta?
-            <a href="login.php" class="text-green-700 hover:underline font-medium">Inicia sesión</a><br>
-            <a href="index.php" class="text-green-700 hover:underline font-medium">Volver al inicio</a>
+            <a href="login.php" class="text-green-700 font-medium hover:underline">Inicia sesión</a><br>
+            <a href="index.php" class="text-green-700 font-medium hover:underline">Volver al inicio</a>
         </p>
+
     </form>
 </div>
-
-<!-- 🟢 ESTILOS INPUT -->
-<style>
-.label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
-}
-.input-box {
-    @apply w-full px-3 py-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition;
-}
-</style>
 
 <!-- 🟢 Notificaciones -->
 <script>
@@ -234,15 +233,16 @@ function mostrarNotificacion(tipo, mensaje) {
     const toast = document.getElementById("toast");
 
     toast.className =
-        "fixed top-5 right-5 px-4 py-3 rounded-lg shadow-xl text-white " +
+        "px-4 py-3 rounded-lg shadow-lg text-white fixed top-5 right-5 " +
         (tipo === "success" ? "bg-green-600" : "bg-red-600");
 
     toast.textContent = mensaje;
-    toast.style.display = "block";
+    toast.classList.remove("hidden");
 
-    setTimeout(() => toast.style.display = "none", 3000);
+    setTimeout(() => toast.classList.add("hidden"), 3000);
 }
 </script>
+
 
 <!-- 🟢 Enviar formulario AJAX -->
 <script>
