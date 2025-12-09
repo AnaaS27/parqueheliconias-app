@@ -1,18 +1,31 @@
 <?php
-include('../includes/verificar_admin.php');
-include('../includes/conexion.php');
+require_once('../includes/verificar_admin.php');
+require_once("../supabase.php");
 include('header_admin.php');
 
-// --- Cargar selects de BD ---
-$roles = pg_query($conn, "SELECT id_rol, nombre FROM roles ORDER BY id_rol ASC");
-$instituciones = pg_query($conn, "SELECT id_institucion, nombre_institucion FROM instituciones ORDER BY nombre_institucion ASC");
-$ciudades = pg_query($conn, "SELECT id, nombre FROM ciudades ORDER BY nombre ASC");
+// ===============================
+// CARGAR SELECTS DESDE SUPABASE
+// ===============================
+
+// Roles
+list($codeRoles, $roles) = supabase_select("roles", [], 0, 200);
+
+// Instituciones
+list($codeInst, $instituciones) = supabase_select("instituciones", [], 0, 500);
+
+// Ciudades
+list($codeCiudades, $ciudades) = supabase_select("ciudades", [], 0, 500);
 
 
-// --- Variables de error ---
+// ===============================
+// VARIABLES DE ERROR
+// ===============================
 $mensajeError = "";
 
-// --- Procesar formulario ---
+
+// ===============================
+// PROCESAR FORMULARIO
+// ===============================
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     $nombre      = trim($_POST['nombre']);
@@ -26,46 +39,47 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $institucion = intval($_POST['institucion']);
     $ciudad      = intval($_POST['ciudad']);
     $fecha_nac   = $_POST['fecha_nacimiento'];
-    $activo      = isset($_POST['usuario_activo']) ? 'TRUE' : 'FALSE';
+    $activo      = isset($_POST['usuario_activo']) ? true : false;
 
+    // Validación básica
     if ($nombre === "" || $apellido === "" || $correo === "" || $password === "") {
         $mensajeError = "Todos los campos obligatorios deben completarse.";
     } else {
 
-        // Verificar correo repetido
-        $sqlCheck = "SELECT id_usuario FROM usuarios WHERE correo = $1 LIMIT 1";
-        $respCheck = pg_query_params($conn, $sqlCheck, [$correo]);
+        // ===============================
+        // VERIFICAR CORREO REPETIDO
+        // ===============================
 
-        if (pg_num_rows($respCheck) > 0) {
+        list($codeCheck, $checkCorreo) = supabase_select("usuarios", ["correo" => $correo]);
+
+        if ($codeCheck === 200 && !empty($checkCorreo)) {
             $mensajeError = "El correo ya está registrado.";
         } else {
 
-            // Insertar registro
+            // ===============================
+            // INSERTAR REGISTRO
+            // ===============================
             $passHash = password_hash($password, PASSWORD_DEFAULT);
 
-            $sqlInsert = "
-                INSERT INTO usuarios
-                (nombre, apellido, correo, documento, contrasena, telefono, id_rol,
-                fecha_nacimiento, id_genero, id_institucion, id_ciudad, usuario_activo, fecha_creacion)
-                VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
-            ";
+            $data = [
+                "nombre"           => $nombre,
+                "apellido"         => $apellido,
+                "correo"           => $correo,
+                "documento"        => $documento,
+                "contrasena"       => $passHash,
+                "telefono"         => $telefono,
+                "id_rol"           => $rol,
+                "fecha_nacimiento" => $fecha_nac,
+                "id_genero"        => $genero,
+                "id_institucion"   => $institucion,
+                "id_ciudad"        => $ciudad,
+                "usuario_activo"   => $activo,
+                "fecha_creacion"   => date("Y-m-d H:i:s")
+            ];
 
-            $ok = pg_query_params($conn, $sqlInsert, [
-                $nombre,
-                $apellido,
-                $correo,
-                $documento,
-                $passHash,
-                $telefono,
-                $rol,
-                $fecha_nac,
-                $genero,
-                $institucion,
-                $ciudad,
-                $activo
-            ]);
+            list($codeInsert, $respInsert) = supabase_insert("usuarios", $data);
 
-            if ($ok) {
+            if ($codeInsert === 201) {
                 $_SESSION['mensaje_exito'] = "Usuario creado correctamente.";
                 header("Location: usuarios.php");
                 exit;
@@ -77,7 +91,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 }
 ?>
 
-<!-- CONTENIDO -->
+<!-- ========================= -->
+<!-- FORMULARIO (NO TOCADO)   -->
+<!-- ========================= -->
 <div class="max-w-4xl mx-auto px-6 py-8">
 
     <div class="bg-white shadow-lg rounded-xl p-6 border border-gray-200">
@@ -150,9 +166,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <label class="block text-gray-700 font-medium mb-1">Rol *</label>
                 <select name="rol"
                 class="w-full px-4 py-2 border rounded-lg bg-gray-50 focus:ring">
-                    <?php while ($r = pg_fetch_assoc($roles)): ?>
+                    <?php foreach ($roles as $r): ?>
                         <option value="<?= $r['id_rol'] ?>"><?= $r['nombre'] ?></option>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </select>
             </div>
 
@@ -173,9 +189,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <label class="block text-gray-700 font-medium mb-1">Institución *</label>
                 <select name="institucion"
                 class="w-full px-4 py-2 border rounded-lg bg-gray-50 focus:ring">
-                    <?php while ($i = pg_fetch_assoc($instituciones)): ?>
+                    <?php foreach ($instituciones as $i): ?>
                         <option value="<?= $i['id_institucion'] ?>"><?= $i['nombre_institucion'] ?></option>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </select>
             </div>
 
@@ -184,9 +200,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <label class="block text-gray-700 font-medium mb-1">Ciudad *</label>
                 <select name="ciudad"
                 class="w-full px-4 py-2 border rounded-lg bg-gray-50 focus:ring">
-                    <?php while ($c = pg_fetch_assoc($ciudades)): ?>
+                    <?php foreach ($ciudades as $c): ?>
                         <option value="<?= $c['id'] ?>"><?= $c['nombre'] ?></option>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </select>
             </div>
 
@@ -200,7 +216,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <div class="col-span-2 flex justify-between mt-4">
 
                 <a href="usuarios.php"
-                   class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
                     <i class="fa-solid fa-arrow-left"></i> Regresar
                 </a>
 
