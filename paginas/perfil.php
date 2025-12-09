@@ -1,42 +1,76 @@
 <?php
 session_start();
 include('../includes/verificar_sesion.php');
-include('../includes/conexion.php');
+include('../includes/supabase.php');
+include('../includes/email_api.php'); // ← tu nuevo sistema de correos
 
-$id_usuario = $_SESSION['usuario_id'];
+// ============================================
+// 1️⃣ VALIDAR SESIÓN
+// ============================================
+if (!isset($_SESSION['usuario_id'])) {
+    echo "<script>alert('Debes iniciar sesión.'); window.location='../login.php';</script>";
+    exit;
+}
 
-// 🔹 Obtener los datos actuales del usuario
-$sql = "SELECT nombre, apellido, correo, telefono, contrasena FROM usuarios WHERE id_usuario = $1";
-$result = pg_query_params($conn, $sql, array($id_usuario));
-$usuario = pg_fetch_assoc($result);
-
+$id_usuario = intval($_SESSION['usuario_id']);
 $mensaje = "";
 
-// 🔹 Guardar cambios del perfil
+// ============================================
+// 2️⃣ OBTENER DATOS DEL USUARIO DESDE SUPABASE
+// ============================================
+list($codeUser, $dataUser) = supabase_get("usuarios?id_usuario=eq.$id_usuario&select=*");
+
+if ($codeUser !== 200 || empty($dataUser)) {
+    echo "<script>alert('Error cargando datos.'); window.location='inicio.php';</script>";
+    exit;
+}
+
+$usuario = $dataUser[0];
+
+// ============================================
+// 3️⃣ ACTUALIZAR DATOS DEL PERFIL
+// ============================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['actualizar_perfil'])) {
+
     $nombre = trim($_POST['nombre']);
     $apellido = trim($_POST['apellido']);
     $correo = trim($_POST['correo']);
     $telefono = trim($_POST['telefono']);
 
-    $sql_update = "UPDATE usuarios 
-                   SET nombre = $1, apellido = $2, correo = $3, telefono = $4 
-                   WHERE id_usuario = $5";
+    $actualizacion = [
+        "nombre" => $nombre,
+        "apellido" => $apellido,
+        "correo" => $correo,
+        "telefono" => $telefono
+    ];
 
-    $params = array($nombre, $apellido, $correo, $telefono, $id_usuario);
+    list($updCode, $updData) = supabase_update("usuarios?id_usuario=eq.$id_usuario", $actualizacion);
 
-    $result_update = pg_query_params($conn, $sql_update, $params);
+    if ($updCode === 200) {
 
-    if ($result_update) {
+        // 📨 Enviar correo de cambios
+        $infoCambios = "
+            <p>Nombre: <b>$nombre</b></p>
+            <p>Apellido: <b>$apellido</b></p>
+            <p>Correo: <b>$correo</b></p>
+            <p>Teléfono: <b>$telefono</b></p>
+        ";
+
+        enviarCorreoCambioDatos($correo, $nombre, $infoCambios);
+
         $mensaje = "✅ Datos actualizados correctamente.";
         $_SESSION['nombre'] = $nombre;
+
     } else {
-        $mensaje = "❌ Error al actualizar los datos. Inténtalo nuevamente.";
+        $mensaje = "❌ Error al actualizar los datos.";
     }
 }
 
-// 🔹 Cambiar contraseña
+// ============================================
+// 4️⃣ CAMBIO DE CONTRASEÑA
+// ============================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cambiar_contrasena'])) {
+
     $actual = trim($_POST['contrasena_actual']);
     $nueva = trim($_POST['nueva_contrasena']);
     $confirmar = trim($_POST['confirmar_contrasena']);
@@ -50,12 +84,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cambiar_contrasena'])
     } elseif (strlen($nueva) < 6) {
         $mensaje = "⚠️ La nueva contraseña debe tener al menos 6 caracteres.";
     } else {
+
         $hash = password_hash($nueva, PASSWORD_DEFAULT);
 
-        $sql_pass = "UPDATE usuarios SET contrasena = $1 WHERE id_usuario = $2";
-        $result_pass = pg_query_params($conn, $sql_pass, array($hash, $id_usuario));
+        list($passCode, $passData) = supabase_update(
+            "usuarios?id_usuario=eq.$id_usuario",
+            ["contrasena" => $hash]
+        );
 
-        if ($result_pass) {
+        if ($passCode === 200) {
+
+            // 📨 Enviar correo de seguridad
+            enviarCorreoPassword($usuario["correo"], $usuario["nombre"]);
+
             $mensaje = "✅ Contraseña actualizada correctamente.";
         } else {
             $mensaje = "❌ Error al actualizar la contraseña.";
