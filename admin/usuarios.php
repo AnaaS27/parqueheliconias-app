@@ -1,51 +1,70 @@
 <?php
 include('../includes/verificar_admin.php');
-include('../includes/conexion.php');
+include('../includes/supabase.php');
 include('header_admin.php');
 
-// ===== CONFIG PAGINACIÓN =====
+// =====================================
+// 🔧 CONFIGURACIÓN PAGINACIÓN
+// =====================================
 $registrosPorPagina = 10;
 $paginaActual = isset($_GET['pagina']) ? max(1, intval($_GET['pagina'])) : 1;
 $offset = ($paginaActual - 1) * $registrosPorPagina;
 
-// ===== FILTROS =====
-$filtro = $_GET['filtro'] ?? 'activos';
+// =====================================
+// 🔎 FILTROS
+// =====================================
+$filtro   = $_GET['filtro']  ?? 'activos';
 $busqueda = trim($_GET['buscar'] ?? '');
 
-// Base del WHERE
 $where = [];
 
+// Estado
 if ($filtro === 'activos') {
-    $where[] = "usuario_activo = TRUE";
+    $where[] = "usuario_activo=eq.true";
 } elseif ($filtro === 'inactivos') {
-    $where[] = "usuario_activo = FALSE";
+    $where[] = "usuario_activo=eq.false";
 }
 
-// Búsqueda por nombre o correo
+// Búsqueda
 if ($busqueda !== "") {
-    $busquedaSQL = pg_escape_string($conn, $busqueda);
-    $where[] = "(nombre ILIKE '%$busquedaSQL%' OR correo ILIKE '%$busquedaSQL%')";
+    $texto = urlencode("%$busqueda%");
+    $where[] = "(nombre=ilike.$texto,correo=ilike.$texto)";
 }
 
-$whereSQL = count($where) ? "WHERE " . implode(" AND ", $where) : "";
+// Convertir condiciones a formato Supabase
+$filtrosQuery = "";
+if (!empty($where)) {
+    foreach ($where as $cond) {
+        $filtrosQuery .= "&" . $cond;
+    }
+}
 
-// ===== CONSULTA principal con paginación =====
-$sql = "
-    SELECT * 
-    FROM usuarios 
-    $whereSQL
-    ORDER BY id_usuario ASC
-    LIMIT $registrosPorPagina OFFSET $offset
-";
-$resultado = pg_query($conn, $sql);
+// =====================================
+// 📌 OBTENER LISTA DE USUARIOS LIMITADA (PÁGINA)
+// =====================================
+$endpoint = "usuarios?select=*&order=id_usuario.asc&limit=$registrosPorPagina&offset=$offset" . $filtrosQuery;
 
-// ===== CONSULTA para total de registros =====
-$sqlTotal = "SELECT COUNT(*) AS total FROM usuarios $whereSQL";
-$resTotal = pg_fetch_assoc(pg_query($conn, $sqlTotal));
-$totalRegistros = $resTotal['total'];
+list($codeUsers, $usuarios) = supabase_get($endpoint);
+
+if ($codeUsers !== 200) {
+    $usuarios = [];
+}
+
+// =====================================
+// 📌 CONTAR TOTAL DE REGISTROS FILTRADOS
+// Supabase: select=count:id
+// =====================================
+$countEndpoint = "usuarios?select=count:id" . $filtrosQuery;
+
+list($codeCount, $countData) = supabase_get($countEndpoint);
+
+$totalRegistros = ($codeCount === 200 && !empty($countData))
+    ? intval($countData[0]["count"])
+    : 0;
+
 $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
-?>
 
+?>
 
 <div class="max-w-7xl mx-auto px-4 py-6">
 
@@ -118,8 +137,8 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
                 </thead>
 
                 <tbody>
-                <?php if (pg_num_rows($resultado) > 0): ?>
-                    <?php while ($usuario = pg_fetch_assoc($resultado)): ?>
+                <?php if (!empty($usuarios)): ?>
+                    <?php foreach ($usuarios as $usuario): ?>
                         <tr class="border-b hover:bg-gray-50 transition">
                             <td class="px-6 py-4"><?= $usuario['id_usuario'] ?></td>
 
@@ -172,7 +191,7 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
                                 <?php endif; ?>
                             </td>
                         </tr>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
                         <td colspan="6" class="text-center py-6 text-gray-500">No hay usuarios para mostrar.</td>
@@ -185,12 +204,12 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
             <div class="px-6 py-4 flex justify-between items-center text-sm">
 
                 <span class="text-gray-600">
-                    Mostrando <?= pg_num_rows($resultado) ?> de <?= $totalRegistros ?> usuarios
+                    Mostrando <?= count($usuarios) ?> de <?= $totalRegistros ?> usuarios
                 </span>
 
                 <div class="flex gap-2">
 
-                    <!-- Botón Anterior -->
+                    <!-- Anterior -->
                     <?php if ($paginaActual > 1): ?>
                         <a href="?pagina=<?= $paginaActual - 1 ?>&filtro=<?= $filtro ?>&buscar=<?= $busqueda ?>"
                             class="px-3 py-1 border rounded-lg bg-gray-100 hover:bg-gray-200">
@@ -211,7 +230,7 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
                         </a>
                     <?php endfor; ?>
 
-                    <!-- Botón Siguiente -->
+                    <!-- Siguiente -->
                     <?php if ($paginaActual < $totalPaginas): ?>
                         <a href="?pagina=<?= $paginaActual + 1 ?>&filtro=<?= $filtro ?>&buscar=<?= $busqueda ?>"
                             class="px-3 py-1 border rounded-lg bg-gray-100 hover:bg-gray-200">
@@ -256,15 +275,4 @@ function confirmarRestauracion(id, nombre) {
 }
 </script>
 
-<script>
-    setTimeout(() => {
-        const alertBox = document.querySelector('.alert');
-        if (alertBox) {
-            alertBox.classList.remove('show');
-            alertBox.classList.add('fade');
-        }
-    }, 4000);
-</script>
-
 <?php include('footer_admin.php'); ?>
-

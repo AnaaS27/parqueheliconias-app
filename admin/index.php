@@ -1,28 +1,47 @@
 <?php include('header_admin.php'); ?>
-<?php include('../includes/conexion.php'); ?>
+<?php include('../includes/supabase.php'); ?>
 
 <?php
-// === CONSULTAS RÁPIDAS PARA LOS CONTADORES ===
+// ========================================
+// 🔢 CONTADOR: ACTIVIDADES
+// ========================================
+list($codeAct, $resAct) = supabase_get("actividades?select=count:id");
 
-// Total actividades
-$sql1 = "SELECT COUNT(*) AS total FROM actividades";
-$res1 = pg_query($conn, $sql1);
-$total_actividades = ($res1 && pg_num_rows($res1)) ? pg_fetch_assoc($res1)['total'] : 0;
+$total_actividades = ($codeAct === 200 && !empty($resAct))
+    ? intval($resAct[0]['count'])
+    : 0;
 
-// Total reservas
-$sql2 = "SELECT COUNT(*) AS total FROM reservas";
-$res2 = pg_query($conn, $sql2);
-$total_reservas = ($res2 && pg_num_rows($res2)) ? pg_fetch_assoc($res2)['total'] : 0;
 
-// Total usuarios
-$sql3 = "SELECT COUNT(*) AS total FROM usuarios WHERE usuario_activo = TRUE"; // mejor práctica
-$res3 = pg_query($conn, $sql3);
-$total_usuarios = ($res3 && pg_num_rows($res3)) ? pg_fetch_assoc($res3)['total'] : 0;
+// ========================================
+// 🔢 CONTADOR: RESERVAS TOTALES
+// ========================================
+list($codeRes, $resReservas) = supabase_get("reservas?select=count:id");
 
-// Reservas pendientes
-$sql4 = "SELECT COUNT(*) AS total FROM reservas WHERE estado = 'pendiente'";
-$res4 = pg_query($conn, $sql4);
-$reservas_pendientes = ($res4 && pg_num_rows($res4)) ? pg_fetch_assoc($res4)['total'] : 0;
+$total_reservas = ($codeRes === 200 && !empty($resReservas))
+    ? intval($resReservas[0]['count'])
+    : 0;
+
+
+// ========================================
+// 🔢 CONTADOR: USUARIOS ACTIVOS
+// ========================================
+list($codeUsers, $resUsers) = supabase_get("usuarios?usuario_activo=eq.true&select=count:id");
+
+$total_usuarios = ($codeUsers === 200 && !empty($resUsers))
+    ? intval($resUsers[0]['count'])
+    : 0;
+
+
+// ========================================
+// 🔢 CONTADOR: RESERVAS PENDIENTES
+// ========================================
+$estado = urlencode("pendiente");
+list($codePend, $resPend) = supabase_get("reservas?estado=eq.$estado&select=count:id");
+
+$reservas_pendientes = ($codePend === 200 && !empty($resPend))
+    ? intval($resPend[0]['count'])
+    : 0;
+
 ?>
 
 <section class="admin-dashboard">
@@ -30,10 +49,11 @@ $reservas_pendientes = ($res4 && pg_num_rows($res4)) ? pg_fetch_assoc($res4)['to
   <p class="subtitulo-dashboard">Bienvenido, administrador. Aquí puedes gestionar y monitorear las principales actividades del sistema.</p>
 
   <div class="tarjetas-dashboard">
+
     <div class="tarjeta-admin">
       <div class="icono-tarjeta">🎫</div>
       <div class="info-tarjeta">
-        <h3><?php echo $total_actividades; ?></h3>
+        <h3><?= $total_actividades ?></h3>
         <p>Actividades registradas</p>
       </div>
     </div>
@@ -41,7 +61,7 @@ $reservas_pendientes = ($res4 && pg_num_rows($res4)) ? pg_fetch_assoc($res4)['to
     <div class="tarjeta-admin">
       <div class="icono-tarjeta">📅</div>
       <div class="info-tarjeta">
-        <h3><?php echo $total_reservas; ?></h3>
+        <h3><?= $total_reservas ?></h3>
         <p>Total de reservas</p>
       </div>
     </div>
@@ -49,7 +69,7 @@ $reservas_pendientes = ($res4 && pg_num_rows($res4)) ? pg_fetch_assoc($res4)['to
     <div class="tarjeta-admin">
       <div class="icono-tarjeta">👥</div>
       <div class="info-tarjeta">
-        <h3><?php echo $total_usuarios; ?></h3>
+        <h3><?= $total_usuarios ?></h3>
         <p>Usuarios activos</p>
       </div>
     </div>
@@ -57,10 +77,11 @@ $reservas_pendientes = ($res4 && pg_num_rows($res4)) ? pg_fetch_assoc($res4)['to
     <div class="tarjeta-admin pendiente">
       <div class="icono-tarjeta">⏳</div>
       <div class="info-tarjeta">
-        <h3><?php echo $reservas_pendientes; ?></h3>
+        <h3><?= $reservas_pendientes ?></h3>
         <p>Reservas pendientes</p>
       </div>
     </div>
+
   </div>
 
   <div class="acciones-rapidas">
