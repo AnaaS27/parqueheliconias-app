@@ -1,7 +1,7 @@
 <?php
 session_start();
-include('../includes/verificar_sesion_admin.php');
-include('../includes/conexion.php'); // Aquí ya tienes $conn como pg_connect
+require_once('../includes/verificar_sesion_admin.php');
+require_once("../includes/supabase.php"); // ← ÚNICA conexión válida
 
 // --- Validar datos recibidos ---
 if (!isset($_POST['id_reserva']) || !isset($_POST['estado'])) {
@@ -16,61 +16,81 @@ if (!isset($_POST['id_reserva']) || !isset($_POST['estado'])) {
 $id_reserva = intval($_POST['id_reserva']);
 $nuevo_estado = $_POST['estado'];
 
-// --- 1️⃣ Verificar que la reserva exista ---
-$sql_check = "SELECT id_usuario FROM reservas WHERE id_reserva = $1";
-$result = pg_query_params($conn, $sql_check, [$id_reserva]);
+// ================================
+// 1️⃣ Verificar que la reserva exista
+// ================================
+list($codeReserva, $reservaData) = supabase_get("reservas", ["id_reserva" => $id_reserva]);
 
-if (!$result || pg_num_rows($result) === 0) {
+if ($codeReserva !== 200 || empty($reservaData)) {
     $_SESSION['toast'] = [
-        'mensaje' => '⚠️ La reserva no existe.',
+        'mensaje' => '⚠ La reserva no existe.',
         'tipo' => 'warning'
     ];
     header("Location: reservas.php");
     exit;
 }
 
-$reserva = pg_fetch_assoc($result);
-$id_usuario = $reserva['id_usuario'];
+$id_usuario = $reservaData[0]["id_usuario"];
 
-// --- 2️⃣ Actualizar estado de la reserva ---
-$sql_update = "UPDATE reservas SET estado = $1 WHERE id_reserva = $2";
-$update_result = pg_query_params($conn, $sql_update, [$nuevo_estado, $id_reserva]);
+// ================================
+// 2️⃣ Actualizar estado en Supabase
+// ================================
+$updateData = ["estado" => $nuevo_estado];
 
-if ($update_result) {
+list($codeUpdate, $respUpdate) = supabase_update(
+    "reservas",
+    ["id_reserva" => $id_reserva],
+    $updateData
+);
 
-    // --- 3️⃣ Crear notificación según el estado ---
-    if ($nuevo_estado === 'confirmada') {
-        $titulo = '🎉 ¡Reserva Confirmada!';
-        $mensaje = 'Tu reserva ha sido confirmada por el administrador. Te esperamos para disfrutar del Parque de las Heliconias.';
-        $tipo = 'exito';
-    } elseif ($nuevo_estado === 'cancelada') {
-        $titulo = '❌ Reserva Cancelada';
-        $mensaje = 'Tu reserva ha sido cancelada por el administrador. Puedes volver a realizar otra cuando desees.';
-        $tipo = 'error';
-    } else {
-        $titulo = 'ℹ️ Estado actualizado';
-        $mensaje = 'El estado de tu reserva ha sido actualizado.';
-        $tipo = 'info';
-    }
-
-    $sql_notif = "INSERT INTO notificaciones (id_usuario, id_reserva, titulo, mensaje, tipo, fecha_creacion, leida)
-                  VALUES ($1, $2, $3, $4, $5, NOW(), false)";
-    pg_query_params($conn, $sql_notif, [$id_usuario, $id_reserva, $titulo, $mensaje, $tipo]);
-
-    $_SESSION['toast'] = [
-        'mensaje' => '✅ Estado actualizado correctamente.',
-        'tipo' => 'exito'
-    ];
-
-} else {
+if ($codeUpdate !== 200 && $codeUpdate !== 204) {
     $_SESSION['toast'] = [
         'mensaje' => '❌ Error al actualizar el estado de la reserva.',
         'tipo' => 'error'
     ];
+    header("Location: reservas.php");
+    exit;
 }
 
-// --- 4️⃣ Redirigir ---
+// ================================
+// 3️⃣ Crear notificación según estado
+// ================================
+if ($nuevo_estado === 'confirmada') {
+    $titulo = '🎉 ¡Reserva Confirmada!';
+    $mensaje = 'Tu reserva ha sido confirmada por el administrador. ¡Te esperamos para disfrutar del Parque Las Heliconias!';
+    $tipo = 'exito';
+
+} elseif ($nuevo_estado === 'cancelada') {
+    $titulo = '❌ Reserva Cancelada';
+    $mensaje = 'Tu reserva ha sido cancelada por el administrador. Puedes volver a realizar otra cuando desees.';
+    $tipo = 'error';
+
+} else {
+    $titulo = 'ℹ Estado actualizado';
+    $mensaje = 'El estado de tu reserva ha sido actualizado.';
+    $tipo = 'info';
+}
+
+$notifData = [
+    "id_usuario"    => $id_usuario,
+    "id_reserva"    => $id_reserva,
+    "titulo"        => $titulo,
+    "mensaje"       => $mensaje,
+    "tipo"          => $tipo,
+    "fecha_creacion"=> date("Y-m-d H:i:s"),
+    "leida"         => false
+];
+
+supabase_insert("notificaciones", $notifData);
+
+// ================================
+// 4️⃣ Mostrar mensaje final
+// ================================
+$_SESSION['toast'] = [
+    'mensaje' => '✅ Estado actualizado correctamente.',
+    'tipo' => 'exito'
+];
+
 header("Location: reservas.php");
 exit;
 ?>
-

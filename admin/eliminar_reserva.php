@@ -1,7 +1,10 @@
 <?php
-include('../includes/conexion.php');
-include('../includes/verificar_admin.php');
+require_once("../includes/supabase.php"); 
+require_once('../includes/verificar_admin.php');
 
+// ===============================
+// Validación del ID
+// ===============================
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     echo "<script>alert('❌ ID no especificado'); window.location='reservas.php';</script>";
     exit;
@@ -9,42 +12,54 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $id = intval($_GET['id']);
 
-// Obtener datos antes de eliminar para enviar notificación
-$sqlInfo = "SELECT r.id_usuario, a.nombre AS actividad 
-            FROM reservas r 
-            INNER JOIN actividades a ON r.id_actividad = a.id_actividad
-            WHERE r.id_reserva = $1";
-$result = pg_query_params($conn, $sqlInfo, [$id]);
+// ===============================
+// 1️⃣ OBTENER DATOS DE LA RESERVA (usuario y actividad)
+// ===============================
+list($codeInfo, $reservaData) = supabase_get("reservas", ["id_reserva" => $id]);
 
-if (!$result || pg_num_rows($result) === 0) {
+if ($codeInfo !== 200 || empty($reservaData)) {
     echo "<script>alert('❌ La reserva no existe'); window.location='reservas.php';</script>";
     exit;
 }
 
-$datos = pg_fetch_assoc($result);
-$id_usuario = $datos['id_usuario'];
-$actividad = $datos['actividad'];
+$reserva = $reservaData[0];
+$id_usuario = $reserva["id_usuario"];
+$id_actividad = $reserva["id_actividad"];
 
-// Eliminar la reserva
-$sql = "DELETE FROM reservas WHERE id_reserva = $1";
-$resultDelete = pg_query_params($conn, $sql, [$id]);
+// Obtener nombre de la actividad
+list($codeAct, $actividadData) = supabase_get("actividades", ["id_actividad" => $id_actividad]);
+$actividad = $actividadData[0]["nombre"] ?? "Actividad desconocida";
 
-if ($resultDelete) {
+// ===============================
+// 2️⃣ ELIMINAR RESERVA EN SUPABASE
+// ===============================
+list($codeDelete, $deleteResponse) = supabase_delete("reservas", ["id_reserva" => $id]);
 
-    // Registrar notificación
-    $titulo = "Reserva Eliminada";
-    $mensaje = "Tu reserva para '$actividad' fue eliminada por el administrador.";
-    $tipo = "alerta";
-
-    $sqlNotif = "INSERT INTO notificaciones (id_usuario, titulo, mensaje, tipo, leida, fecha_creacion) 
-                 VALUES ($1, $2, $3, $4, FALSE, NOW())";
-
-    pg_query_params($conn, $sqlNotif, [$id_usuario, $titulo, $mensaje, $tipo]);
-
-    echo "<script>alert('✅ Reserva eliminada correctamente'); window.location='reservas.php';</script>";
-} else {
+if ($codeDelete !== 200 && $codeDelete !== 204) {
     echo "<script>alert('❌ No se pudo eliminar la reserva'); window.history.back();</script>";
+    exit;
 }
 
-pg_close($conn);
+// ===============================
+// 3️⃣ REGISTRAR NOTIFICACIÓN
+// ===============================
+$titulo = "Reserva Eliminada";
+$mensaje = "Tu reserva para '$actividad' fue eliminada por el administrador.";
+
+$notifData = [
+    "id_usuario"      => $id_usuario,
+    "titulo"          => $titulo,
+    "mensaje"         => $mensaje,
+    "tipo"            => "alerta",
+    "leida"           => false,
+    "fecha_creacion"  => date("Y-m-d H:i:s")
+];
+
+supabase_insert("notificaciones", $notifData);
+
+// ===============================
+// 4️⃣ Respuesta visual
+// ===============================
+echo "<script>alert('✅ Reserva eliminada correctamente'); window.location='reservas.php';</script>";
+exit;
 ?>

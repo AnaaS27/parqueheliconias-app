@@ -1,17 +1,29 @@
 <?php
 session_start();
 include('../includes/verificar_admin.php');
-include('../includes/conexion.php');
+include('../includes/supabase.php');
 
 $id = $_GET['id'] ?? null;
 
 if (!$id) {
-    die("<script>alert('ID Inválido');location.href='usuarios.php';</script>");
+    echo "<script>alert('ID inválido'); location.href='usuarios.php';</script>";
+    exit;
 }
 
-$sql = "UPDATE usuarios SET activo = TRUE WHERE id_usuario = $1";
-pg_query_params($conn, $sql, [$id]);
+// ===============================
+// ⭐ Restaurar usuario en Supabase
+// ===============================
+$endpoint = "usuarios?id_usuario=eq.$id";
+$data = ["usuario_activo" => true];
 
+list($code, $response) = supabase_update($endpoint, $data);
+
+if ($code !== 200 && $code !== 204) {
+    echo "<script>alert('❌ Error al restaurar el usuario'); location.href='usuarios.php';</script>";
+    exit;
+}
+
+// Éxito
 header("Location: usuarios.php?filtro=inactivos");
 exit;
 ?>

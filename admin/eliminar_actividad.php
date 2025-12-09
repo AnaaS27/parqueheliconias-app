@@ -1,9 +1,9 @@
 <?php
-include('../includes/conexion.php');
-include('../includes/verificar_admin.php');
+require_once("../includes/supabase.php"); // ← Única conexión permitida
+require_once('../includes/verificar_admin.php');
 
 // -----------------------------
-// Validación del parámetro ID
+// Validación de ID
 // -----------------------------
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     echo "<script>alert('❌ ID de actividad no especificado'); window.location='actividades.php';</script>";
@@ -15,22 +15,21 @@ $id = intval($_GET['id']);
 // -----------------------------
 // Verificar si la actividad existe
 // -----------------------------
-$sqlCheck = "SELECT nombre FROM actividades WHERE id_actividad = $1";
-$resultCheck = pg_query_params($conn, $sqlCheck, [$id]);
+list($codeCheck, $actividadData) = supabase_get("actividades", ["id_actividad" => $id]);
 
-if (!$resultCheck || pg_num_rows($resultCheck) === 0) {
+if ($codeCheck !== 200 || empty($actividadData)) {
     echo "<script>alert('❌ La actividad no existe'); window.location='actividades.php';</script>";
     exit;
 }
 
-$actividad = pg_fetch_assoc($resultCheck)['nombre'];
+$actividadNombre = $actividadData[0]["nombre"];
 
 // -----------------------------
 // Verificar dependencias (reservas)
 // -----------------------------
-$sqlDep = "SELECT COUNT(*) AS total FROM reservas WHERE id_actividad = $1";
-$resultDep = pg_query_params($conn, $sqlDep, [$id]);
-$depCount = pg_fetch_assoc($resultDep)['total'];
+list($codeDep, $reservas) = supabase_get("reservas", ["id_actividad" => $id]);
+
+$depCount = is_array($reservas) ? count($reservas) : 0;
 
 if ($depCount > 0) {
     echo "<script>
@@ -41,14 +40,13 @@ if ($depCount > 0) {
 }
 
 // -----------------------------
-// Eliminar actividad (sin dependencias)
+// Eliminar actividad
 // -----------------------------
-$sqlDelete = "DELETE FROM actividades WHERE id_actividad = $1";
-$resultDelete = pg_query_params($conn, $sqlDelete, [$id]);
+list($codeDelete, $respDelete) = supabase_delete("actividades", ["id_actividad" => $id]);
 
-if ($resultDelete) {
+if ($codeDelete === 200 || $codeDelete === 204) {
     echo "<script>
-        alert('✅ La actividad \"$actividad\" fue eliminada exitosamente');
+        alert('✅ La actividad \"{$actividadNombre}\" fue eliminada exitosamente');
         window.location='actividades.php';
     </script>";
 } else {
@@ -56,8 +54,6 @@ if ($resultDelete) {
         alert('❌ No se pudo eliminar la actividad. Intenta nuevamente.');
         window.history.back();
     </script>";
+    exit;
 }
-
-pg_close($conn);
 ?>
-

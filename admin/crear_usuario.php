@@ -8,13 +8,13 @@ include('header_admin.php');
 // ===============================
 
 // Roles
-list($codeRoles, $roles) = supabase_select("roles", [], 0, 200);
+list($codeRoles, $roles) = supabase_get("roles", [], 0, 200);
 
 // Instituciones
-list($codeInst, $instituciones) = supabase_select("instituciones", [], 0, 500);
+list($codeInst, $instituciones) = supabase_get("instituciones", [], 0, 500);
 
 // Ciudades
-list($codeCiudades, $ciudades) = supabase_select("ciudades", [], 0, 500);
+list($codeCiudades, $ciudades) = supabase_get("ciudades", [], 0, 500);
 
 
 // ===============================
@@ -50,7 +50,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         // VERIFICAR CORREO REPETIDO
         // ===============================
 
-        list($codeCheck, $checkCorreo) = supabase_select("usuarios", ["correo" => $correo]);
+        list($codeCheck, $checkCorreo) = supabase_get("usuarios", ["correo" => $correo]);
 
         if ($codeCheck === 200 && !empty($checkCorreo)) {
             $mensajeError = "El correo ya está registrado.";

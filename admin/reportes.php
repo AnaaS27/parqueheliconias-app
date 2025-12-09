@@ -1,98 +1,107 @@
 <?php
 include('header_admin.php');
-include('../includes/conexion.php');
 include('../includes/verificar_admin.php');
-
-// ==========================
-//   CONFIGURACIÓN BASE
-// ==========================
-$QTY     = "COALESCE(r.numero_participantes, 1)";
-$DATECOL = "COALESCE(r.fecha_visita, DATE(r.fecha_reserva))";
+include('../includes/supabase.php');
 
 // ==========================
 //   FILTROS DEL REPORTE
 // ==========================
 $inicio    = $_GET['inicio'] ?? date('Y-m-01');
 $fin       = $_GET['fin']    ?? date('Y-m-t');
-$actividad = isset($_GET['actividad']) && $_GET['actividad'] !== '' ? (int)$_GET['actividad'] : null;
-
-// Actividades para el select
-$acts = pg_query($conn, "SELECT id_actividad, nombre FROM actividades ORDER BY nombre ASC");
+$actividad = isset($_GET['actividad']) && $_GET['actividad'] !== '' ? intval($_GET['actividad']) : null;
 
 // ==========================
-//          KPIs
+//   CARGAR ACTIVIDADES
+// ==========================
+list($codeActs, $acts) = supabase_get("actividades?select=id_actividad,nombre&order=nombre.asc");
+if ($codeActs !== 200) $acts = [];
+
+// ==========================
+//   KPIs
 // ==========================
 
-$DATECOL = "COALESCE(p.fecha_visita, DATE(r.fecha_reserva))";
+// 🔹 Total reservas (excepto canceladas)
+$query = "reservas?select=id_reserva,fecha_reserva,fecha_visita,estado,numero_participantes&id_actividad=neq.null"
+       . "&fecha_reserva=gte.$inicio&fecha_reserva=lte.$fin";
 
-$sqlResumen = "
-  SELECT
-    COALESCE(rsum.reservadas,0) AS reservadas,
-    COALESCE(asum.asistidas,0)  AS asistidas,
-    CASE WHEN COALESCE(rsum.reservadas,0)=0 THEN 0
-         ELSE ROUND(COALESCE(asum.asistidas,0)::numeric/rsum.reservadas*100,2) END AS tasa_asistencia,
-    CASE WHEN COALESCE(rsum.reservadas,0)=0 THEN 0
-         ELSE ROUND((1-COALESCE(asum.asistidas,0)::numeric/rsum.reservadas)*100,2) END AS tasa_no_show
-  FROM
-    ( SELECT SUM(CASE WHEN r.estado <> 'cancelada' OR r.estado IS NULL THEN COALESCE(r.numero_participantes,1) ELSE 0 END) AS reservadas
-      FROM reservas r
-      LEFT JOIN participantes_reserva p ON p.id_reserva = r.id_reserva
-      WHERE $DATECOL BETWEEN $1 AND $2
-            " . ($actividad ? " AND r.id_actividad = $3 " : "") . "
-    ) rsum
-  CROSS JOIN
-    ( SELECT COUNT(a.id_asistencia) AS asistidas
-      FROM reservas r
-      LEFT JOIN participantes_reserva p ON p.id_reserva = r.id_reserva
-      LEFT JOIN asistencia a ON a.id_reserva = r.id_reserva
-      WHERE $DATECOL BETWEEN $1 AND $2
-            " . ($actividad ? " AND r.id_actividad = $3 " : "") . "
-    ) asum
-";
+if ($actividad) $query .= "&id_actividad=eq.$actividad";
 
+list($codeR, $reservas) = supabase_get($query);
+if ($codeR !== 200) $reservas = [];
 
-
-// Construcción de parámetros según si hay actividad
-$params = $actividad ? [$inicio, $fin, $actividad] : [$inicio, $fin];
-
-$stmt = pg_query_params($conn, $sqlResumen, $params);
-
-if (!$stmt) {
-    echo "<p style='color:red'>❌ Error en la consulta: " . pg_last_error($conn) . "</p>";
-    $resumen = ['reservadas'=>0,'asistidas'=>0,'tasa_asistencia'=>0,'tasa_no_show'=>0];
-} else {
-    $resumen = pg_fetch_assoc($stmt);
+// 🔹 Total reservadas
+$total_reservadas = 0;
+foreach ($reservas as $r) {
+    if ($r['estado'] !== 'cancelada') {
+        $total_reservadas += ($r['numero_participantes'] ?? 1);
+    }
 }
 
-// ==========================
-//   TUS REPORTES ORIGINALES
-// ==========================
+// 🔹 Total asistencias
+list($codeA, $asistencias) = supabase_get("asistencia?select=id_asistencia,id_reserva&fecha_asistencia=gte.$inicio&fecha_asistencia=lte.$fin");
+if ($codeA !== 200) $asistencias = [];
 
-// 1. Reservas por actividad
-$sql_actividades = "
-  SELECT a.nombre AS actividad, COUNT(r.id_reserva) AS total_reservas
-  FROM reservas r
-  INNER JOIN actividades a ON r.id_actividad = a.id_actividad
-  GROUP BY a.nombre
-  ORDER BY total_reservas DESC";
-$result_actividades = pg_query($conn, $sql_actividades);
+$total_asistidas = count($asistencias);
 
-// 2. Reservas por estado
-$sql_estados = "
-  SELECT estado, COUNT(*) AS total
-  FROM reservas
-  GROUP BY estado";
-$result_estados = pg_query($conn, $sql_estados);
+// 🔹 KPI cálculos
+$tasa_asistencia = $total_reservadas > 0 ? round(($total_asistidas / $total_reservadas) * 100, 2) : 0;
+$tasa_no_show    = $total_reservadas > 0 ? round((1 - ($total_asistidas / $total_reservadas)) * 100, 2) : 0;
 
-// 3. Usuarios más activos
-$sql_usuarios = "
-  SELECT u.nombre, u.apellido, COUNT(r.id_reserva) AS total_reservas
-  FROM reservas r
-  INNER JOIN usuarios u ON r.id_usuario = u.id_usuario
-  GROUP BY u.id_usuario, u.nombre, u.apellido
-  ORDER BY total_reservas DESC
-  LIMIT 5";
-$result_usuarios = pg_query($conn, $sql_usuarios);
+// ===============================
+//   REPORTES ORIGINALES
+// ===============================
+
+// 1️⃣ Reservas por actividad
+list($codeRa, $resAct) = supabase_get("
+    reservas?select=id_reserva,id_actividad,actividades(nombre)
+    &actividades!inner=id_actividad
+");
+if ($codeRa !== 200) $resAct = [];
+
+$report_actividades = [];
+foreach ($resAct as $r) {
+    $nom = $r['actividades']['nombre'];
+    if (!isset($report_actividades[$nom])) $report_actividades[$nom] = 0;
+    $report_actividades[$nom]++;
+}
+
+// 2️⃣ Reservas por estado
+list($codeRe, $resEst) = supabase_get("
+    reservas?select=estado
+");
+if ($codeRe !== 200) $resEst = [];
+
+$report_estados = [];
+foreach ($resEst as $r) {
+    $e = $r["estado"] ?? "sin estado";
+    if (!isset($report_estados[$e])) $report_estados[$e] = 0;
+    $report_estados[$e]++;
+}
+
+// 3️⃣ Usuarios más activos
+list($codeU, $users) = supabase_get("
+    reservas?select=id_reserva,usuarios(id_usuario,nombre,apellido)
+    &usuarios!inner=id_usuario
+");
+if ($codeU !== 200) $users = [];
+
+$report_usuarios = [];
+foreach ($users as $r) {
+    $u = $r['usuarios'];
+    $id = $u['id_usuario'];
+    if (!isset($report_usuarios[$id])) {
+        $report_usuarios[$id] = [
+            "nombre" => $u["nombre"],
+            "apellido" => $u["apellido"],
+            "total" => 0
+        ];
+    }
+    $report_usuarios[$id]["total"]++;
+}
+
+// Top 5
+usort($report_usuarios, fn($a,$b) => $b["total"] - $a["total"]);
+$report_usuarios = array_slice($report_usuarios, 0, 5);
 ?>
 
 <link rel="stylesheet" href="../css/admin.css">
@@ -103,7 +112,8 @@ $result_usuarios = pg_query($conn, $sql_usuarios);
   <!-- ========================= -->
   <!--     FILTROS DE REPORTE    -->
   <!-- ========================= -->
-  <form method="get" class="filtros" style="display:grid;grid-template-columns:repeat(8,1fr);gap:.75rem;margin-bottom:2rem;">
+  <form method="get" class="filtros" 
+        style="display:grid;grid-template-columns:repeat(8,1fr);gap:.75rem;margin-bottom:2rem;">
 
     <label style="grid-column:span 2;">Desde:
       <input type="date" name="inicio" value="<?= htmlspecialchars($inicio) ?>">
@@ -116,146 +126,92 @@ $result_usuarios = pg_query($conn, $sql_usuarios);
     <label style="grid-column:span 3;">Actividad:
       <select name="actividad">
         <option value="">Todas</option>
-        <?php while($a = pg_fetch_assoc($acts)): ?>
-          <option value="<?= $a['id_actividad'] ?>" <?= $actividad === (int)$a['id_actividad'] ? 'selected' : '' ?>>
+        <?php foreach($acts as $a): ?>
+          <option value="<?= $a['id_actividad'] ?>"
+            <?= $actividad === (int)$a['id_actividad'] ? 'selected' : '' ?>>
             <?= htmlspecialchars($a['nombre']) ?>
           </option>
-        <?php endwhile; ?>
+        <?php endforeach ?>
       </select>
     </label>
 
-    <button type="submit" style="grid-column:span 1;background:#c62828;color:#fff;border:0;border-radius:8px;padding:.6rem 1rem;">Aplicar</button>
-
+    <button type="submit" 
+      style="grid-column:span 1;background:#c62828;color:#fff;border:0;border-radius:8px;padding:.6rem 1rem;">
+      Aplicar
+    </button>
   </form>
-
-  <!-- ========================= -->
-  <!--  BOTONES DE EXPORTACIÓN   -->
-  <!-- ========================= -->
-  <div style="display:flex;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap;">
-    <a class="btn-exportar"
-      href="api/exportar_reservas_csv.php?inicio=<?= urlencode($inicio) ?>&fin=<?= urlencode($fin) ?>&actividad=<?= urlencode($actividad ?? '') ?>"
-      style="display:inline-block;background:#0F172A;color:#fff;padding:.7rem 1rem;border-radius:8px;text-decoration:none;font-weight:600;">
-      📥 Exportar reservas
-    </a>
-
-    <a class="btn-exportar"
-      href="api/exportar_actividades_csv.php?inicio=<?= urlencode($inicio) ?>&fin=<?= urlencode($fin) ?>"
-      style="display:inline-block;background:#2e7d32;color:#fff;padding:.7rem 1rem;border-radius:8px;text-decoration:none;font-weight:600;">
-      📥 Exportar actividades
-    </a>
-
-    <a class="btn-exportar"
-      href="api/exportar_instituciones_csv.php"
-      style="display:inline-block;background:#1565c0;color:#fff;padding:.7rem 1rem;border-radius:8px;text-decoration:none;font-weight:600;">
-      📥 Exportar instituciones
-    </a>
-
-    <a class="btn-exportar"
-      href="api/exportar_usuarios_csv.php"
-      style="display:inline-block;background:#c62828;color:#fff;padding:.7rem 1rem;border-radius:8px;text-decoration:none;font-weight:600;">
-      📥 Exportar usuarios
-    </a>
-
-    <a class="btn-exportar"
-      href="api/exportar_asistencia_csv.php?inicio=<?= urlencode($inicio) ?>&fin=<?= urlencode($fin) ?>&actividad=<?= urlencode($actividad ?? '') ?>"
-      style="display:inline-block;background:#6A1B9A;color:#fff;padding:.7rem 1rem;border-radius:8px;text-decoration:none;font-weight:600;">
-      📥 Exportar asistencia
-    </a>
-
-  </div>
 
   <!-- ========================= -->
   <!--            KPIs           -->
   <!-- ========================= -->
   <div class="kpis" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:1.5rem 0;">
-    <div class="kpi"><h3>Reservadas</h3><p><?= (int)$resumen['reservadas'] ?></p></div>
-    <div class="kpi"><h3>Asistidas</h3><p><?= (int)$resumen['asistidas'] ?></p></div>
-    <div class="kpi"><h3>% Asistencia</h3><p><?= number_format((float)$resumen['tasa_asistencia'],2) ?>%</p></div>
-    <div class="kpi"><h3>% No-Show</h3><p><?= number_format((float)$resumen['tasa_no_show'],2) ?>%</p></div>
+    <div class="kpi"><h3>Reservadas</h3><p><?= $total_reservadas ?></p></div>
+    <div class="kpi"><h3>Asistidas</h3><p><?= $total_asistidas ?></p></div>
+    <div class="kpi"><h3>% Asistencia</h3><p><?= $tasa_asistencia ?>%</p></div>
+    <div class="kpi"><h3>% No-Show</h3><p><?= $tasa_no_show ?>%</p></div>
   </div>
 
   <!-- ========================= -->
-  <!--   TUS REPORTES ORIGINALES -->
+  <!--    REPORTES ORIGINALES    -->
   <!-- ========================= -->
 
   <h2 style="margin-top:2rem;">📁 Reportes Generales</h2>
 
   <div class="reportes-grid">
 
+    <!-- 1️⃣ Reservas por actividad -->
     <div class="reporte-card">
       <h3>🎫 Reservas por Actividad</h3>
       <table class="tabla-admin">
-      <thead><tr><th>Actividad</th><th>Total</th></tr></thead>
-      <tbody>
-        <?php while($row=pg_fetch_assoc($result_actividades)): ?>
-        <tr><td><?= htmlspecialchars($row['actividad']) ?></td><td><?= $row['total_reservas'] ?></td></tr>
-        <?php endwhile; ?>
-      </tbody>
+        <thead><tr><th>Actividad</th><th>Total</th></tr></thead>
+        <tbody>
+          <?php foreach($report_actividades as $act => $total): ?>
+            <tr><td><?= htmlspecialchars($act) ?></td><td><?= $total ?></td></tr>
+          <?php endforeach ?>
+        </tbody>
       </table>
     </div>
 
+    <!-- 2️⃣ Reservas por estado -->
     <div class="reporte-card">
       <h3>📅 Reservas por Estado</h3>
       <table class="tabla-admin">
-      <thead><tr><th>Estado</th><th>Total</th></tr></thead>
-      <tbody>
-        <?php while($row=pg_fetch_assoc($result_estados)): ?>
-        <tr><td><?= ucfirst($row['estado']) ?></td><td><?= $row['total'] ?></td></tr>
-        <?php endwhile; ?>
-      </tbody>
+        <thead><tr><th>Estado</th><th>Total</th></tr></thead>
+        <tbody>
+          <?php foreach($report_estados as $estado => $total): ?>
+            <tr><td><?= ucfirst($estado) ?></td><td><?= $total ?></td></tr>
+          <?php endforeach ?>
+        </tbody>
       </table>
     </div>
 
+    <!-- 3️⃣ Usuarios más activos -->
     <div class="reporte-card">
       <h3>👥 Usuarios Más Activos</h3>
       <table class="tabla-admin">
-      <thead><tr><th>Usuario</th><th>Total Reservas</th></tr></thead>
-      <tbody>
-        <?php while($row=pg_fetch_assoc($result_usuarios)): ?>
-        <tr><td><?= htmlspecialchars($row['nombre']." ".$row['apellido']) ?></td><td><?= $row['total_reservas'] ?></td></tr>
-        <?php endwhile; ?>
-      </tbody>
+        <thead><tr><th>Usuario</th><th>Total Reservas</th></tr></thead>
+        <tbody>
+          <?php foreach($report_usuarios as $u): ?>
+            <tr>
+              <td><?= htmlspecialchars($u["nombre"]." ".$u["apellido"]) ?></td>
+              <td><?= $u["total"] ?></td>
+            </tr>
+          <?php endforeach ?>
+        </tbody>
       </table>
     </div>
 
   </div>
 
-    <h3 style="margin-top:2rem;">Gráficos de asistencia</h3>
+  <!-- ========================= -->
+  <!--      GRÁFICOS (igual)     -->
+  <!-- ========================= -->
 
-    <div style="display:grid;gap:1rem;">
-      <style>
-        canvas {
-          width: 100% !important;
-          max-width: 700px;
-          height: auto !important;
-          aspect-ratio: 16/9;
-          display: block;
-          margin: auto;
-        }
+  <h3 style="margin-top:2rem;">Gráficos de asistencia</h3>
 
-        .chart-container {
-          width: 100%;
-          max-width: 700px;
-          height: 380px;
-          margin: 0 auto;
-        }
-
-        canvas {
-          width: 100% !important;
-          height: 100% !important;
-        }
-      </style>
-
-      <div class="chart-container">
-          <canvas id="chartMes"></canvas>
-      </div>
-      <div class="chart-container">
-          <canvas id="chartWeekday"></canvas>
-      </div>
-      <div class="chart-container">
-          <canvas id="chartHour"></canvas>
-      </div>
-    </div>
+  <div class="chart-container"><canvas id="chartMes"></canvas></div>
+  <div class="chart-container"><canvas id="chartWeekday"></canvas></div>
+  <div class="chart-container"><canvas id="chartHour"></canvas></div>
 
 </section>
 

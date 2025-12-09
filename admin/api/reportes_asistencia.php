@@ -1,239 +1,220 @@
 <?php
 include('../../includes/verificar_admin.php');
-include('../../includes/conexion.php');
+include('../../includes/supabase.php');
+
 header('Content-Type: application/json');
 
-// Manejo de errores
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-set_exception_handler(function($e){
-  http_response_code(500);
-  echo json_encode(['error' => $e->getMessage()]);
-  exit;
-});
-
-if (!$conn) {
-  http_response_code(500);
-  echo json_encode(['error'=>'Sin conexión a la base de datos']);
-  exit;
-}
-
-// PARÁMETROS
+// ===============================
+//  CAPTURA DE PARÁMETROS
+// ===============================
 $tipo      = $_GET['tipo'] ?? 'por_actividad';
 $inicio    = $_GET['inicio'] ?? date('Y-m-01');
 $fin       = $_GET['fin']    ?? date('Y-m-t');
-$actividad = isset($_GET['actividad']) && $_GET['actividad'] !== '' ? (int)$_GET['actividad'] : null;
+$actividad = isset($_GET['actividad']) && $_GET['actividad'] !== '' ? intval($_GET['actividad']) : null;
 
-// COLUMNAS CALCULADAS
-$QTY     = "COALESCE(r.numero_participantes,1)";
-$DATECOL = "COALESCE(r.fecha_visita, DATE(r.fecha_reserva))";
 
-// FUNCION PARA CONSULTAS
-function runQuery(mysqli $conn, string $sql, array $params) {
-  $stmt = $conn->prepare($sql);
-  if ($params) {
-    $types = "";
-    foreach ($params as $p) $types .= is_int($p) ? "i" : "s";
-    $stmt->bind_param($types, ...$params);
-  }
-  $stmt->execute();
-  return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+// ===============================
+//  FUNCIONES AUXILIARES
+// ===============================
+
+// Obtener reservas filtradas
+function cargarReservas($inicio, $fin, $actividad)
+{
+    $query = "reservas?select=*&fecha_reserva=gte.$inicio&fecha_reserva=lte.$fin";
+
+    if ($actividad)
+        $query .= "&id_actividad=eq.$actividad";
+
+    list($code, $data) = supabase_get($query);
+
+    return ($code === 200 && is_array($data)) ? $data : [];
 }
 
-/* ============================
-   REPORTE POR ACTIVIDAD
-============================ */
+// Obtener asistencias completas
+function cargarAsistencias()
+{
+    list($code, $data) = supabase_get("asistencia?select=id_asistencia,id_reserva,fecha_asistencia");
+
+    return ($code === 200 && is_array($data)) ? $data : [];
+}
+
+// Obtener actividades
+function cargarActividades()
+{
+    list($code, $data) = supabase_get("actividades?select=id_actividad,nombre");
+
+    return ($code === 200 && is_array($data)) ? $data : [];
+}
+
+
+// ===============================
+//  CARGAR DATA BASE
+// ===============================
+$reservas    = cargarReservas($inicio, $fin, $actividad);
+$asistencias = cargarAsistencias();
+$actividades = cargarActividades();
+
+
+// ====================================================
+//  TIPO A) REPORTE POR ACTIVIDAD
+// ====================================================
 if ($tipo === 'por_actividad') {
 
-  $sql_ids = "
-    SELECT DISTINCT r.id_actividad
-    FROM reservas r
-    WHERE $DATECOL BETWEEN ? AND ?
-    " . ($actividad ? " AND r.id_actividad = ?" : "") . "
-  ";
+    $out = [];
 
-  $params = [$inicio,$fin];
-  if ($actividad) $params[] = $actividad;
+    foreach ($actividades as $a) {
 
-  $ids = runQuery($conn, $sql_ids, $params);
-  if (empty($ids)) { echo json_encode([]); exit; }
+        $id = $a["id_actividad"];
+        $nombre = $a["nombre"];
 
-  $ids_only = array_map(fn($r)=> (int)$r['id_actividad'], $ids);
-  $placeholders = implode(',', array_fill(0, count($ids_only), '?'));
+        // Filtrar reservas por actividad
+        $resAct = array_filter($reservas, fn($r) => $r["id_actividad"] == $id);
 
-  // Reservadas
-  $sql_res = "
-    SELECT r.id_actividad,
-           SUM(CASE WHEN r.estado <> 'cancelada' THEN $QTY ELSE 0 END) AS reservadas
-    FROM reservas r
-    WHERE $DATECOL BETWEEN ? AND ?
-      AND r.id_actividad IN ($placeholders)
-    GROUP BY r.id_actividad
-  ";
-  $params_res = array_merge([$inicio,$fin], $ids_only);
-  $reservas = runQuery($conn, $sql_res, $params_res);
-  $map_res = [];
-  foreach ($reservas as $r) $map_res[(int)$r['id_actividad']] = (float)$r['reservadas'];
+        if (!$resAct) continue;
 
-  // Asistidas
-  $sql_as = "
-    SELECT r.id_actividad,
-           COUNT(a.id_asistencia) AS asistidas
-    FROM reservas r
-    LEFT JOIN asistencia a ON a.id_reserva = r.id_reserva
-    WHERE $DATECOL BETWEEN ? AND ?
-      AND r.id_actividad IN ($placeholders)
-    GROUP BY r.id_actividad
-  ";
-  $params_as = array_merge([$inicio,$fin], $ids_only);
-  $asis = runQuery($conn, $sql_as, $params_as);
-  $map_as = [];
-  foreach ($asis as $r) $map_as[(int)$r['id_actividad']] = (int)$r['asistidas'];
+        // Reservadas
+        $reservadas = 0;
+        foreach ($resAct as $r) {
+            if (($r["estado"] ?? "") !== "cancelada") {
+                $reservadas += $r["numero_participantes"] ?? 1;
+            }
+        }
 
-  // Nombres
-  $sql_n = "SELECT id_actividad, nombre FROM actividades WHERE id_actividad IN ($placeholders)";
-  $names = runQuery($conn, $sql_n, $ids_only);
-  $map_nm = [];
-  foreach ($names as $r) $map_nm[(int)$r['id_actividad']] = $r['nombre'];
+        // Asistidas
+        $asisCount = 0;
+        foreach ($asistencias as $a2) {
+            foreach ($resAct as $r) {
+                if ($a2["id_reserva"] == $r["id_reserva"]) {
+                    $asisCount++;
+                }
+            }
+        }
 
-  $out = [];
-  foreach ($ids_only as $id) {
-    $res = $map_res[$id] ?? 0;
-    $asi = $map_as[$id] ?? 0;
-    $por = $res ? round($asi / $res * 100, 2) : 0;
+        $porcentaje = ($reservadas > 0)
+            ? round(($asisCount / $reservadas) * 100, 2)
+            : 0;
 
-    $out[] = [
-      'actividad'  => $map_nm[$id] ?? ('Actividad '.$id),
-      'reservadas' => $res,
-      'asistidas'  => $asi,
-      'porcentaje' => $por
-    ];
-  }
+        $out[] = [
+            "actividad"  => $nombre,
+            "reservadas" => $reservadas,
+            "asistidas"  => $asisCount,
+            "porcentaje" => $porcentaje
+        ];
+    }
 
-  usort($out, fn($a,$b)=> $b['asistidas'] <=> $a['asistidas']);
+    usort($out, fn($a, $b) => $b["asistidas"] <=> $a["asistidas"]);
 
-  echo json_encode($out);
-  exit;
+    echo json_encode($out);
+    exit;
 }
 
-/* ============================
-   TENDENCIA MENSUAL
-============================ */
+
+
+// ====================================================
+//  TIPO B) TENDENCIA MENSUAL
+// ====================================================
 if ($tipo === 'trend') {
 
-  $params = [$inicio,$fin];
-  if ($actividad) $params[] = $actividad;
+    $months = [];
 
-  $sql = "
-    SELECT DATE_FORMAT($DATECOL,'%Y-%m') AS mes
-    FROM reservas r
-    WHERE $DATECOL BETWEEN ? AND ?
-    " . ($actividad ? " AND r.id_actividad = ?" : "") . "
-    GROUP BY mes ORDER BY mes
-  ";
+    foreach ($reservas as $r) {
 
-  $meses = runQuery($conn,$sql,$params);
-  if (empty($meses)) { echo json_encode([]); exit; }
+        $fecha = $r["fecha_visita"] ?: $r["fecha_reserva"];
+        $mes = substr($fecha, 0, 7); // YYYY-MM
 
-  $labels = array_column($meses,'mes');
+        if (!isset($months[$mes])) {
+            $months[$mes] = ["reservadas" => 0, "asistidas" => 0];
+        }
 
-  // reservadas
-  $sqlR = "
-    SELECT DATE_FORMAT($DATECOL,'%Y-%m') AS mes,
-           SUM(CASE WHEN r.estado <> 'cancelada' THEN $QTY ELSE 0 END) AS reservadas
-    FROM reservas r
-    WHERE $DATECOL BETWEEN ? AND ?
-    " . ($actividad ? " AND r.id_actividad = ?" : "") . "
-    GROUP BY mes
-  ";
+        if (($r["estado"] ?? "") !== "cancelada") {
+            $months[$mes]["reservadas"] += $r["numero_participantes"] ?? 1;
+        }
 
-  $resR = runQuery($conn,$sqlR,$params);
-  $map_res = [];
-  foreach ($resR as $r) $map_res[$r['mes']] = $r['reservadas'];
+        foreach ($asistencias as $a) {
+            if ($a["id_reserva"] == $r["id_reserva"]) {
+                $months[$mes]["asistidas"]++;
+            }
+        }
+    }
 
-  // asistidas
-  $sqlA = "
-    SELECT DATE_FORMAT($DATECOL,'%Y-%m') AS mes,
-           COUNT(a.id_asistencia) AS asistidas
-    FROM reservas r
-    LEFT JOIN asistencia a ON a.id_reserva = r.id_reserva
-    WHERE $DATECOL BETWEEN ? AND ?
-    " . ($actividad ? " AND r.id_actividad = ?" : "") . "
-    GROUP BY mes
-  ";
+    $out = [];
+    foreach ($months as $mes => $vals) {
+        $out[] = [
+            "mes"        => $mes,
+            "reservadas" => $vals["reservadas"],
+            "asistidas"  => $vals["asistidas"]
+        ];
+    }
 
-  $resA = runQuery($conn,$sqlA,$params);
-  $map_asi = [];
-  foreach ($resA as $r) $map_asi[$r['mes']] = $r['asistidas'];
-
-  // salida final
-  $out = [];
-  foreach ($labels as $m) {
-    $out[] = [
-      'mes'        => $m,
-      'reservadas' => $map_res[$m] ?? 0,
-      'asistidas'  => $map_asi[$m] ?? 0
-    ];
-  }
-
-  echo json_encode($out);
-  exit;
+    echo json_encode($out);
+    exit;
 }
 
-/* ============================
-   DÍA DE LA SEMANA
-============================ */
+
+
+// ====================================================
+//  TIPO C) DÍA DE LA SEMANA (0-6)
+// ====================================================
 if ($tipo === 'weekday') {
 
-  $params = [$inicio,$fin];
-  if ($actividad) $params[] = $actividad;
+    $dias = [
+        0 => "Dom",
+        1 => "Lun",
+        2 => "Mar",
+        3 => "Mié",
+        4 => "Jue",
+        5 => "Vie",
+        6 => "Sáb"
+    ];
 
-  $sql = "
-    SELECT
-      (DAYOFWEEK($DATECOL)-1) AS dow,
-      CASE (DAYOFWEEK($DATECOL)-1)
-        WHEN 0 THEN 'Dom'
-        WHEN 1 THEN 'Lun'
-        WHEN 2 THEN 'Mar'
-        WHEN 3 THEN 'Mié'
-        WHEN 4 THEN 'Jue'
-        WHEN 5 THEN 'Vie'
-        ELSE 'Sáb'
-      END AS dow_nombre,
-      COUNT(a.id_asistencia) AS asistidas
-    FROM reservas r
-    LEFT JOIN asistencia a ON a.id_reserva = r.id_reserva
-    WHERE $DATECOL BETWEEN ? AND ?
-    " . ($actividad ? " AND r.id_actividad = ?" : "") . "
-    GROUP BY dow, dow_nombre
-    ORDER BY dow
-  ";
+    $out = [];
 
-  echo json_encode(runQuery($conn,$sql,$params));
-  exit;
+    foreach ($reservas as $r) {
+        $fecha = $r["fecha_visita"] ?: $r["fecha_reserva"];
+        $dow   = date("w", strtotime($fecha)); // 0=Domingo
+
+        if (!isset($out[$dow])) {
+            $out[$dow] = ["dow" => $dow, "dow_nombre" => $dias[$dow], "asistidas" => 0];
+        }
+
+        foreach ($asistencias as $a) {
+            if ($a["id_reserva"] == $r["id_reserva"]) {
+                $out[$dow]["asistidas"]++;
+            }
+        }
+    }
+
+    echo json_encode(array_values($out));
+    exit;
 }
 
-/* ============================
-   HORA DEL DÍA
-============================ */
+
+
+// ====================================================
+//  TIPO D) HORA DEL DÍA
+// ====================================================
 if ($tipo === 'hour') {
 
-  $params = [$inicio,$fin];
-  if ($actividad) $params[] = $actividad;
+    $hours = [];
 
-  $sql = "
-    SELECT
-      HOUR(r.fecha_reserva) AS hora,
-      COUNT(a.id_asistencia) AS asistidas
-    FROM reservas r
-    LEFT JOIN asistencia a ON a.id_reserva = r.id_reserva
-    WHERE $DATECOL BETWEEN ? AND ?
-    " . ($actividad ? " AND r.id_actividad = ?" : "") . "
-    GROUP BY hora
-    ORDER BY hora
-  ";
+    foreach ($reservas as $r) {
 
-  echo json_encode(runQuery($conn,$sql,$params));
-  exit;
+        $hora = intval(substr($r["fecha_reserva"], 11, 2)); // HH
+
+        if (!isset($hours[$hora])) {
+            $hours[$hora] = ["hora" => $hora, "asistidas" => 0];
+        }
+
+        foreach ($asistencias as $a) {
+            if ($a["id_reserva"] == $r["id_reserva"]) {
+                $hours[$hora]["asistidas"]++;
+            }
+        }
+    }
+
+    echo json_encode(array_values($hours));
+    exit;
 }
 
 echo json_encode([]);
+?>

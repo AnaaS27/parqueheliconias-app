@@ -1,74 +1,139 @@
 <?php
-include "../../includes/verificar_admin.php";
-include "../../includes/conexion.php";
+require_once "../../includes/verificar_admin.php";
+require_once "../../includes/supabase.php";
 
-// filtros opcionales
+// ============================
+//  FILTROS
+// ============================
 $inicio    = $_GET['inicio'] ?? null;
 $fin       = $_GET['fin'] ?? null;
-$actividad = (isset($_GET['actividad']) && $_GET['actividad'] !== '') ? (int)$_GET['actividad'] : null;
+$actividad = isset($_GET['actividad']) && $_GET['actividad'] !== '' ? (int)$_GET['actividad'] : null;
 
+
+// ============================
+//  CONFIGURACIÓN CSV
+// ============================
 while (ob_get_level()) ob_end_clean();
+
 header('Content-Type: text/csv; charset=UTF-8');
 header('Content-Disposition: attachment; filename=asistencia.csv');
-echo "\xEF\xBB\xBF";
+
+echo "\xEF\xBB\xBF"; // BOM Excel
 echo "sep=;\r\n";
 
-$out = fopen('php://output','w');
+$out = fopen('php://output', 'w');
+
 fputcsv($out, [
     "ID Reserva","Actividad","Fecha Visita","Usuario Nombre","Usuario Apellido",
     "Institucion","Tipo Usuario","Participantes","Estado Reserva","Asistió"
 ], ';');
 
-$sql = "
-SELECT 
-    r.id_reserva,
-    a.nombre AS actividad,
-    COALESCE(r.fecha_visita, DATE(r.fecha_reserva)) AS fecha_visita,
-    u.nombre AS usuario_nombre,
-    u.apellido AS usuario_apellido,
-    inst.nombre_institucion AS institucion,
-    u.id_rol AS tipo_usuario,
-    COALESCE(r.numero_participantes,1) AS participantes,
-    r.estado,
-    CASE WHEN asi.id_asistencia IS NULL THEN 'No' ELSE 'Sí' END AS asistio
-FROM reservas r
-LEFT JOIN actividades a ON r.id_actividad = a.id_actividad
-LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
-LEFT JOIN instituciones inst ON r.id_institucion = inst.id_institucion
-LEFT JOIN asistencia asi ON asi.id_reserva = r.id_reserva
-WHERE 1=1
-";
 
-$params = []; $types = '';
-if ($inicio && $fin) {
-  $sql .= " AND COALESCE(r.fecha_visita, DATE(r.fecha_reserva)) BETWEEN ? AND ? ";
-  $params[] = $inicio; $params[] = $fin; $types .= 'ss';
-}
+// ============================
+//  OBTENER TABLAS NECESARIAS
+// ============================
+
+// Reservas filtradas
+$filters = [];
+
 if ($actividad) {
-  $sql .= " AND r.id_actividad = ? ";
-  $params[] = $actividad; $types .= 'i';
+    $filters["id_actividad"] = $actividad;
 }
-$sql .= " ORDER BY COALESCE(r.fecha_visita, DATE(r.fecha_reserva)) DESC, r.id_reserva DESC";
 
-$stmt = $conn->prepare($sql);
-if ($params) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$res = $stmt->get_result();
+// Obtener todas las reservas (ya filtradas)
+list($codeRes, $reservas) = supabase_get("reservas", $filters, 0, 5000);
+if ($codeRes !== 200) $reservas = [];
 
-while ($row = $res->fetch_assoc()) {
+// Actividades
+list($codeAct, $actividades) = supabase_get("actividades", [], 0, 5000);
+$mapActividades = [];
+foreach ($actividades as $a) {
+    $mapActividades[$a["id_actividad"]] = $a;
+}
+
+// Usuarios
+list($codeUsr, $usuarios) = supabase_get("usuarios", [], 0, 5000);
+$mapUsuarios = [];
+foreach ($usuarios as $u) {
+    $mapUsuarios[$u["id_usuario"]] = $u;
+}
+
+// Instituciones
+list($codeInst, $insts) = supabase_get("instituciones", [], 0, 5000);
+$mapInst = [];
+foreach ($insts as $i) {
+    $mapInst[$i["id_institucion"]] = $i;
+}
+
+// Asistencia
+list($codeAsi, $asis) = supabase_get("asistencia", [], 0, 5000);
+$mapAsistencia = [];
+foreach ($asis as $a) {
+    $mapAsistencia[$a["id_reserva"]] = $a;
+}
+
+
+// ============================
+//  FILTRAR FECHAS EN PHP
+// ============================
+
+$reservasFiltradas = [];
+
+foreach ($reservas as $r) {
+
+    // Obtener fecha_visita o fallback
+    $fecha_visita = $r["fecha_visita"] ?: substr($r["fecha_reserva"], 0, 10);
+
+    // Filtrar por rango de fechas
+    if ($inicio && $fin) {
+        if ($fecha_visita < $inicio || $fecha_visita > $fin) continue;
+    }
+
+    $reservasFiltradas[] = $r;
+}
+
+
+// ============================
+//  ORDENAR POR FECHA DESC
+// ============================
+
+usort($reservasFiltradas, function($a, $b) {
+    $fechaA = $a["fecha_visita"] ?: substr($a["fecha_reserva"], 0, 10);
+    $fechaB = $b["fecha_visita"] ?: substr($b["fecha_reserva"], 0, 10);
+    return strcmp($fechaB, $fechaA);
+});
+
+
+// ============================
+//  GENERAR CSV
+// ============================
+
+foreach ($reservasFiltradas as $r) {
+
+    $id = $r["id_reserva"];
+
+    $actividad_data = $mapActividades[$r["id_actividad"]] ?? [];
+    $usuario_data   = $mapUsuarios[$r["id_usuario"]] ?? [];
+    $inst_data      = $mapInst[$usuario_data["id_institucion"] ?? null] ?? [];
+
+    $asistio = isset($mapAsistencia[$id]) ? "Sí" : "No";
+
+    $fecha_visita = $r["fecha_visita"] ?: substr($r["fecha_reserva"], 0, 10);
+
     fputcsv($out, [
-        $row['id_reserva'],
-        $row['actividad'],
-        $row['fecha_visita'],
-        $row['usuario_nombre'],
-        $row['usuario_apellido'],
-        $row['institucion'],
-        $row['tipo_usuario'],
-        $row['participantes'],
-        $row['estado'],
-        $row['asistio']
+        $id,
+        $actividad_data["nombre"] ?? "",
+        $fecha_visita,
+        $usuario_data["nombre"] ?? "",
+        $usuario_data["apellido"] ?? "",
+        $inst_data["nombre_institucion"] ?? "",
+        $usuario_data["id_rol"] ?? "",
+        $r["numero_participantes"] ?? 1,
+        $r["estado"] ?? "",
+        $asistio
     ], ';');
 }
 
 fclose($out);
 exit;
+?>

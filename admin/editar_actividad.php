@@ -1,6 +1,6 @@
 <?php
 include('header_admin.php');
-include('../includes/conexion.php');
+require_once("../includes/supabase.php"); // ← CONEXIÓN SUPABASE ÚNICA
 
 // Verificar si llega el ID de la actividad
 if (!isset($_GET['id']) || empty($_GET['id'])) {
@@ -10,20 +10,23 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $id_actividad = intval($_GET['id']);
 
-// Consultar la actividad actual
-$sql = "SELECT * FROM actividades WHERE id_actividad = $1";
-$resultado = pg_query_params($conn, $sql, [$id_actividad]);
+// =====================================
+// CONSULTAR ACTIVIDAD DESDE SUPABASE
+// =====================================
 
-if (!$resultado || pg_num_rows($resultado) === 0) {
+list($code, $data) = supabase_get("actividades", ["id_actividad" => $id_actividad]);
+
+if ($code !== 200 || empty($data)) {
     echo "<script>alert('❌ Actividad no encontrada'); window.location='actividades.php';</script>";
     exit;
 }
 
-$actividad = pg_fetch_assoc($resultado);
+// Supabase devuelve array → tomamos el primer resultado
+$actividad = $data[0];
 ?>
 
 <section class="admin-editar-actividad">
-  <h2 class="titulo-dashboard">✏️ Editar Actividad</h2>
+  <h2 class="titulo-dashboard">✏ Editar Actividad</h2>
   <p class="subtitulo-dashboard">Modifica los datos de la actividad seleccionada.</p>
 
   <div class="formulario-admin">
@@ -44,13 +47,13 @@ $actividad = pg_fetch_assoc($resultado);
 
       <label>Estado:</label>
       <select name="activo">
-        <option value="1" <?php if ($actividad['activo'] == 1) echo 'selected'; ?>>Activa</option>
-        <option value="0" <?php if ($actividad['activo'] == 0) echo 'selected'; ?>>Inactiva</option>
+        <option value="1" <?php if ($actividad['activo'] == true || $actividad['activo'] == "1") echo 'selected'; ?>>Activa</option>
+        <option value="0" <?php if ($actividad['activo'] == false || $actividad['activo'] == "0") echo 'selected'; ?>>Inactiva</option>
       </select>
 
       <div class="acciones-formulario">
         <button type="submit" class="btn-admin">💾 Guardar Cambios</button>
-        <a href="actividades.php" class="btn-cancelar">↩️ Volver</a>
+        <a href="actividades.php" class="btn-cancelar">↩ Volver</a>
       </div>
     </form>
   </div>

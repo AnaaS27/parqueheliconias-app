@@ -1,51 +1,63 @@
 <?php
-include('../includes/conexion.php');
-include('../includes/verificar_admin.php');
+require_once("../includes/supabase.php"); // ← ÚNICA conexión válida
+require_once('../includes/verificar_admin.php');
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     // Sanitizar valores
-    $nombre = trim($_POST['nombre']);
+    $nombre      = trim($_POST['nombre']);
     $descripcion = trim($_POST['descripcion']);
-    $duracion = intval($_POST['duracion_minutos']);
-    $cupo = intval($_POST['cupo_maximo']);
-    $activo = ($_POST['activo'] == "1") ? 1 : 0;
+    $duracion    = intval($_POST['duracion_minutos']);
+    $cupo        = intval($_POST['cupo_maximo']);
+    $activo      = ($_POST['activo'] == "1") ? true : false;
 
     if (empty($nombre) || empty($descripcion) || $duracion <= 0 || $cupo <= 0) {
-        echo "<script>alert('⚠️ Todos los campos son obligatorios.'); window.history.back();</script>";
+        echo "<script>alert('⚠ Todos los campos son obligatorios.'); window.history.back();</script>";
         exit;
     }
 
-    // Guardar actividad
-    $sql = "
-        INSERT INTO actividades (nombre, descripcion, duracion_minutos, cupo_maximo, activo)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id_actividad
-    ";
+    // ============================================
+    // 📌 GUARDAR ACTIVIDAD EN SUPABASE
+    // ============================================
 
-    $result = pg_query_params($conn, $sql, [$nombre, $descripcion, $duracion, $cupo, $activo]);
+    $dataActividad = [
+        "nombre"           => $nombre,
+        "descripcion"      => $descripcion,
+        "duracion_minutos" => $duracion,
+        "cupo_maximo"      => $cupo,
+        "activo"           => $activo
+    ];
 
-    if ($result) {
+    list($codeInsert, $respActividad) = supabase_insert("actividades", $dataActividad);
 
-        // Crear la notificación global
-        $titulo = "🆕 Nueva Actividad Disponible";
-        $mensaje = "Se ha agregado una nueva actividad: $nombre. ¡Resérvala y disfruta la experiencia!";
-        $tipo = "info";
-
-        // Notificación sin usuario ni reserva (global)
-        $sqlNotif = "
-            INSERT INTO notificaciones (titulo, mensaje, tipo, id_usuario, id_reserva)
-            VALUES ($1, $2, $3, NULL, NULL)
-        ";
-
-        pg_query_params($conn, $sqlNotif, [$titulo, $mensaje, $tipo]);
-
-        echo "<script>alert('✅ Actividad registrada exitosamente'); window.location='actividades.php';</script>";
-    } else {
-        echo "<script>alert('❌ Error al registrar la actividad'); window.history.back();</script>";
+    if ($codeInsert !== 201) {
+        echo "<script>alert('❌ Error al registrar la actividad en Supabase'); window.history.back();</script>";
+        exit;
     }
 
-    pg_close($conn);
+    // ID de la actividad creada (Supabase devuelve array dentro de array)
+    $idActividad = $respActividad[0]["id_actividad"] ?? null;
+
+    // ============================================
+    // 🔔 CREAR NOTIFICACIÓN GLOBAL EN SUPABASE
+    // ============================================
+
+    $titulo = "🆕 Nueva Actividad Disponible";
+    $mensaje = "Se ha agregado una nueva actividad: $nombre. ¡Resérvala y disfruta la experiencia!";
+
+    $dataNotif = [
+        "titulo"      => $titulo,
+        "mensaje"     => $mensaje,
+        "tipo"        => "info",
+        "id_usuario"  => null,
+        "id_reserva"  => null
+    ];
+
+    list($codeNotif, $respNotif) = supabase_insert("notificaciones", $dataNotif);
+
+    // No detiene el proceso si la notificación falla, solo continúa.
+
+    echo "<script>alert('✅ Actividad registrada exitosamente'); window.location='actividades.php';</script>";
+    exit;
 }
 ?>
-

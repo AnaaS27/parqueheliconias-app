@@ -1,35 +1,55 @@
 <?php
-include('../includes/verificar_admin.php');
-include('../includes/conexion.php');
+require_once('../includes/verificar_admin.php');
+require_once("../includes/supabase.php");
 include('header_admin.php');
 
+// =============================
+// Validar ID
+// =============================
 if (!isset($_GET['id'])) {
     echo "ID de usuario no proporcionado";
     exit;
 }
 
-$id_usuario = $_GET['id'];
+$id_usuario = intval($_GET['id']);
 
-// Obtener datos del usuario
-$query = pg_query($conn, "SELECT * FROM usuarios WHERE id_usuario = $id_usuario");
-$usuario = pg_fetch_assoc($query);
+// =============================
+// 1️⃣ OBTENER DATOS DEL USUARIO
+// =============================
+list($codeUser, $userData) = supabase_get("usuarios", ["id_usuario" => $id_usuario]);
 
-$id_ciudad_usuario = $usuario['id_ciudad'] ?? null;
+if ($codeUser !== 200 || empty($userData)) {
+    echo "<script>alert('❌ Usuario no encontrado'); window.location='usuarios.php';</script>";
+    exit;
+}
+
+$usuario = $userData[0];
+
+// =============================
+// 2️⃣ OBTENER PAÍS A PARTIR DE CIUDAD
+// =============================
+$id_ciudad_usuario = $usuario["id_ciudad"] ?? null;
+
+$id_pais = 1; // Por defecto
 
 if ($id_ciudad_usuario) {
-    $buscarPais = pg_query($conn, "SELECT pais_id FROM ciudades WHERE id = $id_ciudad_usuario");
-    $paisData = pg_fetch_assoc($buscarPais);
-    $id_pais = $paisData['pais_id'];
-} else {
-    // Si el usuario no tiene ciudad registrada, asigna un país por defecto
-    $id_pais = 1; 
+    list($codeCiudad, $ciudadData) = supabase_get("ciudades", ["id" => $id_ciudad_usuario]);
+
+    if ($codeCiudad === 200 && !empty($ciudadData)) {
+        $id_pais = $ciudadData[0]["pais_id"] ?? 1;
+    }
 }
-// Consultas para selects
-$roles = pg_query($conn, "SELECT id_rol, nombre FROM roles ORDER BY id_rol ASC");
-$instituciones = pg_query($conn, "SELECT id_institucion, nombre_institucion FROM instituciones ORDER BY nombre_institucion ASC");
-$generos = pg_query($conn, "SELECT id_genero, genero FROM genero ORDER BY id_genero ASC");
-$ciudades = pg_query($conn, "SELECT id, nombre FROM ciudades WHERE pais_id = $id_pais ORDER BY nombre ASC");
-$paises = pg_query($conn, "SELECT id, pais FROM pais ORDER BY pais ASC");
+
+// =============================
+// 3️⃣ OBTENER SELECTS DESDE SUPABASE
+// =============================
+list($codeRoles, $roles) = supabase_get("roles", [], 0, 200);
+list($codeInst, $instituciones) = supabase_get("instituciones", [], 0, 500);
+list($codeGen, $generos) = supabase_get("genero", [], 0, 50);
+list($codePaises, $paises) = supabase_get("pais", [], 0, 200);
+
+// Ciudades del país seleccionado
+list($codeCiu, $ciudades) = supabase_get("ciudades", ["pais_id" => $id_pais], 0, 500);
 ?>
 
 <div class="max-w-5xl mx-auto p-6">
@@ -121,12 +141,14 @@ $paises = pg_query($conn, "SELECT id, pais FROM pais ORDER BY pais ASC");
                     <label class="block text-gray-700 font-semibold mb-1">Género</label>
                     <select name="id_genero" required
                         class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500">
+                        
                         <option value="">Seleccione...</option>
-                        <?php while ($g = pg_fetch_assoc($generos)): ?>
-                            <option value="<?= $g['id_genero'] ?>" <?= $usuario['id_genero']==$g['id_genero'] ? 'selected' : '' ?>>
-                                <?= $g['genero'] ?>
-                            </option>
-                        <?php endwhile; ?>
+
+                        <?php foreach ($generos as $g): ?>
+                          <option value="<?= $g['id_genero'] ?>" <?= $usuario['id_genero'] == $g['id_genero'] ? 'selected' : '' ?>>
+                              <?= $g['genero'] ?>
+                          </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -135,11 +157,12 @@ $paises = pg_query($conn, "SELECT id, pais FROM pais ORDER BY pais ASC");
                     <label class="block text-gray-700 font-semibold mb-1">Rol</label>
                     <select name="id_rol"
                         class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500">
-                        <?php while ($r = pg_fetch_assoc($roles)): ?>
-                            <option value="<?= $r['id_rol'] ?>" <?= $usuario['id_rol']==$r['id_rol'] ? 'selected':'' ?>>
-                                <?= $r['nombre'] ?>
-                            </option>
-                        <?php endwhile; ?>
+                        
+                        <?php foreach ($roles as $r): ?>
+                          <option value="<?= $r['id_rol'] ?>" <?= $usuario['id_rol'] == $r['id_rol'] ? 'selected' : '' ?>>
+                              <?= $r['nombre'] ?>
+                          </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -148,13 +171,15 @@ $paises = pg_query($conn, "SELECT id, pais FROM pais ORDER BY pais ASC");
                     <label class="block text-gray-700 font-semibold mb-1">Institución</label>
                     <select name="id_institucion" required
                         class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500">
+
                         <option value="">Seleccione...</option>
-                        <?php while ($inst = pg_fetch_assoc($instituciones)): ?>
-                            <option value="<?= $inst['id_institucion'] ?>" 
-                                <?= $usuario['id_instituciones']==$inst['id_institucion'] ? 'selected':'' ?>>
-                                <?= $inst['nombre_institucion'] ?>
-                            </option>
-                        <?php endwhile; ?>
+
+                        <?php foreach ($instituciones as $inst): ?>
+                          <option value="<?= $inst['id_institucion'] ?>" 
+                              <?= $usuario['id_institucion'] == $inst['id_institucion'] ? 'selected' : '' ?>>
+                              <?= $inst['nombre_institucion'] ?>
+                          </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -163,11 +188,13 @@ $paises = pg_query($conn, "SELECT id, pais FROM pais ORDER BY pais ASC");
                     <label class="block text-gray-700 font-semibold mb-1">País</label>
                     <select name="pais" class="w-full px-4 py-2 rounded-lg border border-gray-300"
                         onchange="cargarCiudades(this.value)">
-                        <?php while ($p = pg_fetch_assoc($paises)): ?>
-                            <option value="<?= $p['id'] ?>" <?= $id_pais==$p['id'] ? 'selected' : '' ?>>
-                                <?= $p['pais'] ?>
-                            </option>
-                        <?php endwhile; ?>
+
+                        <?php foreach ($paises as $p): ?>
+                          <option value="<?= $p['id'] ?>" <?= $id_pais == $p['id'] ? 'selected' : '' ?>>
+                              <?= $p['pais'] ?>
+                          </option>
+                        <?php endforeach; ?>
+
                     </select>
                 </div>
 
@@ -176,20 +203,24 @@ $paises = pg_query($conn, "SELECT id, pais FROM pais ORDER BY pais ASC");
                     <label class="block text-gray-700 font-semibold mb-1">Ciudad</label>
                     <select name="id_ciudad" required
                         class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500">
+
                         <option value="">Seleccione...</option>
-                        <?php while ($c = pg_fetch_assoc($ciudades)): ?>
-                            <option value="<?= $c['id'] ?>" <?= $usuario['id_ciudad']==$c['id'] ? 'selected':'' ?>>
-                                <?= $c['nombre'] ?>
-                            </option>
-                        <?php endwhile; ?>
+
+                        <?php foreach ($ciudades as $c): ?>
+                          <option value="<?= $c['id'] ?>" <?= $usuario['id_ciudad'] == $c['id'] ? 'selected' : '' ?>>
+                              <?= $c['nombre'] ?>
+                          </option>
+                        <?php endforeach; ?>
+
                     </select>
                 </div>
 
-                <!-- Estado -->
+                <!-- Estado usuario -->
                 <div>
                     <label class="block text-gray-700 font-semibold mb-1">Estado del usuario</label>
                     <select name="usuario_activo"
                         class="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500">
+
                         <option value="1" <?= $usuario['usuario_activo'] ? 'selected':'' ?>>Activo</option>
                         <option value="0" <?= !$usuario['usuario_activo'] ? 'selected':'' ?>>Inactivo</option>
                     </select>

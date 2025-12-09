@@ -1,77 +1,110 @@
 <?php
 include "../../includes/verificar_admin.php";
-include "../../includes/conexion.php";
+include "../../includes/supabase.php";
 
-mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
-set_exception_handler(fn($e)=> exit(json_encode(['error'=>$e->getMessage()])));
-
-// filtros opcionales
+// ------------------------------
+//   CAPTURA DE PARÁMETROS
+// ------------------------------
 $inicio    = $_GET['inicio'] ?? null;
 $fin       = $_GET['fin'] ?? null;
-$actividad = (isset($_GET['actividad']) && $_GET['actividad'] !== '') ? (int)$_GET['actividad'] : null;
+$actividad = isset($_GET['actividad']) && $_GET['actividad'] !== '' ? (int)$_GET['actividad'] : null;
 
-// headers CSV (BOM + sep=;)
+// ------------------------------
+//   HEADERS CSV (UTF-8 + Excel)
+// ------------------------------
 while (ob_get_level()) ob_end_clean();
-header('Content-Type: text/csv; charset=UTF-8');
-header('Content-Disposition: attachment; filename=reservas.csv');
+
+header("Content-Type: text/csv; charset=UTF-8");
+header("Content-Disposition: attachment; filename=reservas.csv");
+
+// BOM UTF-8
 echo "\xEF\xBB\xBF";
 echo "sep=;\r\n";
 
-$out = fopen('php://output','w');
+$out = fopen("php://output", "w");
+
+// Encabezados
 fputcsv($out, [
-  'ID Reserva','Actividad','Fecha Visita','Fecha Reserva','Tipo Reserva',
-  'Estado','Participantes','Usuario ID','Usuario Nombre','Usuario Apellido',
-  'Institucion ID','Institucion Nombre'
-], ';');
+    "ID Reserva", "Actividad", "Fecha Visita", "Fecha Reserva",
+    "Tipo Reserva", "Estado", "Participantes", "Usuario ID",
+    "Usuario Nombre", "Usuario Apellido", "Institucion ID", "Institucion Nombre"
+], ";");
 
-// Query con joins y filtros
-$sql = "
-  SELECT r.id_reserva, a.nombre AS actividad,
-         COALESCE(r.fecha_visita, DATE(r.fecha_reserva)) AS fecha_visita,
-         r.fecha_reserva, r.tipo_reserva, r.estado, r.numero_participantes,
-         u.id_usuario AS usuario_id, u.nombre AS usuario_nombre, u.apellido AS usuario_apellido,
-         r.id_institucion, inst.nombre_institucion
-  FROM reservas r
-  LEFT JOIN actividades a ON r.id_actividad = a.id_actividad
-  LEFT JOIN usuarios u ON r.id_usuario = u.id_usuario
-  LEFT JOIN instituciones inst ON r.id_institucion = inst.id_institucion
-  WHERE 1=1
-";
+// ------------------------------
+//   CONSTRUIR FILTRO SUPABASE
+// ------------------------------
 
-$params = [];
-$types = '';
+// Base endpoint con JOINS
+$endpoint = "reservas?select="
+           ."id_reserva,"
+           ."fecha_reserva,"
+           ."fecha_visita,"
+           ."tipo_reserva,"
+           ."estado,"
+           ."numero_participantes,"
+           ."id_institucion,"
+           ."actividades(nombre),"
+           ."usuarios(id_usuario,nombre,apellido),"
+           ."instituciones(nombre_institucion)";
+
+// Filtro: fecha
+// Usamos fecha_visita si existe, sino fecha_reserva
 if ($inicio && $fin) {
-  $sql .= " AND COALESCE(r.fecha_visita, DATE(r.fecha_reserva)) BETWEEN ? AND ? ";
-  $params[] = $inicio; $params[] = $fin;
-  $types .= 'ss';
+    $endpoint .= "&fecha_visita=gte.$inicio&fecha_visita=lte.$fin";
 }
+
+// Filtro: actividad
 if ($actividad) {
-  $sql .= " AND r.id_actividad = ? ";
-  $params[] = $actividad; $types .= 'i';
+    $endpoint .= "&id_actividad=eq.$actividad";
 }
-$sql .= " ORDER BY COALESCE(r.fecha_visita, DATE(r.fecha_reserva)) DESC, r.id_reserva DESC";
 
-$stmt = $conn->prepare($sql);
-if ($params) $stmt->bind_param($types, ...$params);
-$stmt->execute();
-$res = $stmt->get_result();
+// Orden final
+$endpoint .= "&order=fecha_visita.desc&order=id_reserva.desc";
 
-while ($row = $res->fetch_assoc()) {
-  fputcsv($out, [
-    $row['id_reserva'],
-    $row['actividad'],
-    $row['fecha_visita'],
-    $row['fecha_reserva'],
-    $row['tipo_reserva'],
-    $row['estado'],
-    $row['numero_participantes'],
-    $row['usuario_id'],
-    $row['usuario_nombre'],
-    $row['usuario_apellido'],
-    $row['id_institucion'],
-    $row['nombre_institucion']
-  ], ';');
+// ------------------------------
+//   CONSULTA A SUPABASE
+// ------------------------------
+list($code, $data) = supabase_get($endpoint);
+
+if ($code !== 200 || empty($data)) {
+    fclose($out);
+    exit; // CSV vacío con solo encabezado
+}
+
+// ------------------------------
+//   ESCRIBIR REGISTROS CSV
+// ------------------------------
+foreach ($data as $r) {
+    
+    // Actividad
+    $actividadNombre = $r["actividades"]["nombre"] ?? "N/A";
+
+    // Usuario
+    $u = $r["usuarios"] ?? null;
+    $usuarioID       = $u["id_usuario"]   ?? "";
+    $usuarioNombre   = $u["nombre"]       ?? "";
+    $usuarioApellido = $u["apellido"]     ?? "";
+
+    // Institución
+    $instNombre = $r["instituciones"]["nombre_institucion"] ?? "";
+    $instID     = $r["id_institucion"] ?? "";
+
+    fputcsv($out, [
+        $r["id_reserva"],
+        $actividadNombre,
+        $r["fecha_visita"],
+        $r["fecha_reserva"],
+        $r["tipo_reserva"],
+        $r["estado"],
+        $r["numero_participantes"],
+        $usuarioID,
+        $usuarioNombre,
+        $usuarioApellido,
+        $instID,
+        $instNombre
+    ], ";");
 }
 
 fclose($out);
 exit;
+?>

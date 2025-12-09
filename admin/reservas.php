@@ -1,25 +1,67 @@
 <?php
 include('header_admin.php');
-include('../includes/conexion.php');
+require_once("../includes/supabase.php");
 
-// Consulta general adaptada a PostgreSQL
-$sql = "
-  SELECT r.id_reserva, 
-         u.nombre AS usuario, 
-         u.apellido,
-         a.nombre AS actividad, 
-         r.fecha_reserva, 
-         r.estado, 
-         r.tipo_reserva, 
-         r.numero_participantes,
-         r.fecha_cancelacion
-  FROM reservas r
-  INNER JOIN usuarios u ON r.id_usuario = u.id_usuario
-  INNER JOIN actividades a ON r.id_actividad = a.id_actividad
-  ORDER BY r.fecha_reserva DESC
-";
+// ================================
+// 1️⃣ OBTENER TODAS LAS RESERVAS
+// ================================
+list($codeRes, $reservas) = supabase_get("reservas", [], 0, 500);
 
-$result = pg_query($conn, $sql);
+if ($codeRes !== 200) {
+    echo "<p style='color:red; text-align:center;'>Error cargando reservas desde Supabase</p>";
+    $reservas = [];
+}
+
+// ================================
+// 2️⃣ OBTENER USUARIOS
+// ================================
+list($codeUser, $usuarios) = supabase_get("usuarios", [], 0, 1000);
+$usuariosPorID = [];
+
+if ($codeUser === 200) {
+    foreach ($usuarios as $u) {
+        $usuariosPorID[$u["id_usuario"]] = $u;
+    }
+}
+
+// ================================
+// 3️⃣ OBTENER ACTIVIDADES
+// ================================
+list($codeAct, $actividades) = supabase_get("actividades", [], 0, 500);
+$actividadesPorID = [];
+
+if ($codeAct === 200) {
+    foreach ($actividades as $a) {
+        $actividadesPorID[$a["id_actividad"]] = $a;
+    }
+}
+
+// ================================
+// 4️⃣ CONSTRUIR LISTA COMPLETA (Simulación de JOIN)
+// ================================
+$lista = [];
+
+foreach ($reservas as $r) {
+    $idU = $r["id_usuario"];
+    $idA = $r["id_actividad"];
+
+    $lista[] = [
+        "id_reserva"          => $r["id_reserva"],
+        "usuario_nombre"      => $usuariosPorID[$idU]["nombre"] ?? "N/A",
+        "usuario_apellido"    => $usuariosPorID[$idU]["apellido"] ?? "",
+        "actividad"           => $actividadesPorID[$idA]["nombre"] ?? "N/A",
+        "fecha_reserva"       => $r["fecha_reserva"],
+        "estado"              => $r["estado"],
+        "tipo_reserva"        => $r["tipo_reserva"],
+        "participantes"       => $r["numero_participantes"],
+        "fecha_cancelacion"   => $r["fecha_cancelacion"] ?? null
+    ];
+}
+
+// Ordenar por fecha como en SQL DESC
+usort($lista, function($a, $b) {
+    return strtotime($b["fecha_reserva"]) - strtotime($a["fecha_reserva"]);
+});
 ?>
 
 <section class="admin-reservas">
@@ -42,16 +84,16 @@ $result = pg_query($conn, $sql);
       </thead>
       <tbody>
 
-        <?php if ($result && pg_num_rows($result) > 0): ?>
-          <?php while ($reserva = pg_fetch_assoc($result)): ?>
+        <?php if (!empty($lista)): ?>
+          <?php foreach ($lista as $reserva): ?>
             <tr>
               <td>#<?= $reserva['id_reserva']; ?></td>
-              <td><?= htmlspecialchars($reserva['usuario'] . " " . $reserva['apellido']); ?></td>
+              <td><?= htmlspecialchars($reserva['usuario_nombre'] . " " . $reserva['usuario_apellido']); ?></td>
               <td><?= htmlspecialchars($reserva['actividad']); ?></td>
               <td><?= ucfirst($reserva['tipo_reserva']); ?></td>
-              <td><?= $reserva['numero_participantes']; ?></td>
+              <td><?= $reserva['participantes']; ?></td>
               <td><?= date("d/m/Y H:i", strtotime($reserva['fecha_reserva'])); ?></td>
-              
+
               <td>
                 <?php 
                   if ($reserva['estado'] == 'pendiente') echo '<span class="estado-pendiente">🕒 Pendiente</span>';
@@ -61,13 +103,14 @@ $result = pg_query($conn, $sql);
               </td>
 
               <td>
+
                 <?php if ($reserva['estado'] == 'pendiente'): ?>
 
                   <!-- Confirmar -->
                   <form action="actualizar_estado_reserva.php" method="POST" style="display:inline;">
                     <input type="hidden" name="id_reserva" value="<?= $reserva['id_reserva']; ?>">
                     <input type="hidden" name="estado" value="confirmada">
-                    <button type="submit" class="btn-accion confirmar" title="Confirmar reserva">✔️</button>
+                    <button type="submit" class="btn-accion confirmar" title="Confirmar reserva">✔</button>
                   </form>
 
                   <!-- Cancelar -->
@@ -84,10 +127,10 @@ $result = pg_query($conn, $sql);
                 <a href="eliminar_reserva.php?id=<?= $reserva['id_reserva']; ?>" 
                    class="btn-accion eliminar"
                    onclick="return confirm('¿Deseas eliminar esta reserva definitivamente?');"
-                   title="Eliminar reserva">🗑️</a>
+                   title="Eliminar reserva">🗑</a>
               </td>
             </tr>
-          <?php endwhile; ?>
+          <?php endforeach; ?>
 
         <?php else: ?>
           <tr><td colspan="8" class="sin-registros">No hay reservas registradas aún.</td></tr>

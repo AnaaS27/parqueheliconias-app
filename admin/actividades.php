@@ -1,6 +1,6 @@
 <?php
 include('header_admin.php');
-include('../includes/conexion.php');
+include('../includes/supabase.php'); // <-- Ahora usamos Supabase
 ?>
 
 <section class="admin-actividades">
@@ -27,39 +27,53 @@ include('../includes/conexion.php');
         </tr>
       </thead>
       <tbody>
-        <?php
-        $sql = "SELECT * FROM actividades ORDER BY id_actividad ASC";
-        $result = pg_query($conn, $sql);
 
-        if ($result && pg_num_rows($result) > 0):
-          while ($row = pg_fetch_assoc($result)):
-        ?>
-          <tr>
-            <td><?php echo $row['id_actividad']; ?></td>
-            <td><?php echo htmlspecialchars($row['nombre']); ?></td>
-            <td><?php echo htmlspecialchars($row['descripcion']); ?></td>
-            <td><?php echo $row['duracion_minutos']; ?> min</td>
-            <td><?php echo $row['cupo_maximo']; ?></td>
-            <td>
-              <?php if ($row['activo'] == '1'): ?>
-                <span class="estado-activo">Activa</span>
-              <?php else: ?>
-                <span class="estado-inactivo">Inactiva</span>
-              <?php endif; ?>
-            </td>
-            <td>
-              <a href="editar_actividad.php?id=<?php echo $row['id_actividad']; ?>" class="btn-accion editar">✏️</a>
-              <a href="eliminar_actividad.php?id=<?php echo $row['id_actividad']; ?>" 
-                 class="btn-accion eliminar" 
-                 onclick="return confirm('¿Seguro que deseas eliminar esta actividad?');">🗑️</a>
-            </td>
-          </tr>
         <?php
-          endwhile;
+        // ===============================
+        //   Consultar actividades
+        // ===============================
+        list($codeAct, $actividades) = supabase_get("actividades?select=*&order=id_actividad.asc");
+
+        if ($codeAct === 200 && !empty($actividades)):
+            foreach ($actividades as $row):
+        ?>
+
+        <tr>
+          <td><?= $row['id_actividad']; ?></td>
+
+          <td><?= htmlspecialchars($row['nombre']); ?></td>
+
+          <td><?= htmlspecialchars($row['descripcion']); ?></td>
+
+          <td><?= $row['duracion_minutos']; ?> min</td>
+
+          <td><?= $row['cupo_maximo']; ?></td>
+
+          <td>
+            <?php if ($row['activo'] == true): ?>
+              <span class="estado-activo">Activa</span>
+            <?php else: ?>
+              <span class="estado-inactivo">Inactiva</span>
+            <?php endif; ?>
+          </td>
+
+          <td>
+            <a href="editar_actividad.php?id=<?= $row['id_actividad'] ?>" 
+               class="btn-accion editar">✏️</a>
+
+            <a href="eliminar_actividad.php?id=<?= $row['id_actividad'] ?>" 
+               class="btn-accion eliminar"
+               onclick="return confirm('¿Seguro que deseas eliminar esta actividad?');">🗑️</a>
+          </td>
+        </tr>
+
+        <?php
+            endforeach;
         else:
-          echo "<tr><td colspan='7' class='sin-registros'>No hay actividades registradas.</td></tr>";
+            echo "<tr><td colspan='7' class='sin-registros'>No hay actividades registradas.</td></tr>";
         endif;
         ?>
+
       </tbody>
     </table>
   </div>
@@ -70,7 +84,9 @@ include('../includes/conexion.php');
   <div class="modal-contenido">
     <button class="btn-cerrar" onclick="cerrarModal()">✖</button>
     <h3>➕ Agregar Nueva Actividad</h3>
+
     <form action="procesar_actividad.php" method="POST">
+
       <label>Nombre:</label>
       <input type="text" name="nombre" required>
 
@@ -85,12 +101,13 @@ include('../includes/conexion.php');
 
       <label>Estado:</label>
       <select name="activo">
-        <option value="1" selected>Activa</option>
-        <option value="0">Inactiva</option>
+        <option value="true" selected>Activa</option>
+        <option value="false">Inactiva</option>
       </select>
 
       <button type="submit" class="btn-admin">Guardar Actividad</button>
     </form>
+
   </div>
 </div>
 
@@ -104,4 +121,3 @@ function cerrarModal() {
 </script>
 
 <?php include('footer_admin.php'); ?>
-

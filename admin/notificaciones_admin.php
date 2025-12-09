@@ -1,53 +1,94 @@
 <?php
 include('header_admin.php');
-include('../includes/conexion.php');
+require_once("../includes/supabase.php");
 
-// 🔹 ID del administrador (puede venir de session si lo deseas después)
+// =====================================
+// 🔸 ID del administrador (puede venir de session)
 $id_admin = 1;
+// =====================================
+
 
 // =============================
-// 🗑 ELIMINAR UNA NOTIFICACIÓN
+// 🗑 1️⃣ ELIMINAR UNA NOTIFICACIÓN
 // =============================
 if (isset($_GET['borrar'])) {
     $id_notif = intval($_GET['borrar']);
-    pg_query_params($conn, "DELETE FROM notificaciones WHERE id_notificacion = $1 AND id_usuario = $2", [$id_notif, $id_admin]);
+
+    // Solo eliminar si pertenece al admin
+    supabase_delete("notificaciones", [
+        "id_notificacion" => $id_notif,
+        "id_usuario" => $id_admin
+    ]);
+
     header("Location: notificaciones_admin.php");
     exit;
 }
 
+
 // =============================
-// 🗑 ELIMINAR TODAS
+// 🗑 2️⃣ BORRAR TODAS LAS NOTIFICACIONES DEL ADMIN
 // =============================
 if (isset($_GET['borrar_todas'])) {
-    pg_query_params($conn, "DELETE FROM notificaciones WHERE id_usuario = $1", [$id_admin]);
+
+    supabase_delete("notificaciones", [
+        "id_usuario" => $id_admin
+    ]);
+
     header("Location: notificaciones_admin.php");
     exit;
 }
 
-// =============================
-// 📌 AGRUPACIÓN DE NOTIFICACIONES POR FECHA
-// =============================
-$sql = "
-    SELECT 
-        DATE(fecha_creacion) AS fecha,
-        STRING_AGG(id_notificacion::text, ',') AS ids,
-        STRING_AGG(titulo, '||') AS titulos,
-        STRING_AGG(mensaje, '||') AS mensajes,
-        STRING_AGG(tipo, '||') AS tipos
-    FROM notificaciones
-    WHERE id_usuario = $1
-    GROUP BY DATE(fecha_creacion)
-    ORDER BY fecha DESC
-";
-
-$result = pg_query_params($conn, $sql, [$id_admin]);
 
 // =============================
-// 🔔 MARCAR COMO LEÍDAS
+// 📌 3️⃣ OBTENER NOTIFICACIONES DEL ADMIN
 // =============================
-pg_query_params($conn, "UPDATE notificaciones SET leida = TRUE WHERE id_usuario = $1", [$id_admin]);
+list($codeNotif, $notifs) = supabase_get(
+    "notificaciones",
+    ["id_usuario" => $id_admin],
+    0,
+    1000
+);
+
+if ($codeNotif !== 200) {
+    $notifs = [];
+}
+
+
+// =============================
+// 🔔 4️⃣ MARCAR TODAS COMO LEÍDAS
+// =============================
+supabase_update(
+    "notificaciones",
+    ["id_usuario" => $id_admin],
+    ["leida" => true]
+);
+
+
+// =============================
+// 📅 5️⃣ AGRUPAR NOTIFICACIONES POR FECHA (en PHP)
+// =============================
+$grupos = [];
+
+foreach ($notifs as $n) {
+    $fecha = date("Y-m-d", strtotime($n["fecha_creacion"]));
+
+    if (!isset($grupos[$fecha])) {
+        $grupos[$fecha] = [
+            "titulos" => [],
+            "mensajes" => [],
+            "tipos"   => [],
+            "ids"     => []
+        ];
+    }
+
+    $grupos[$fecha]["titulos"][]  = $n["titulo"];
+    $grupos[$fecha]["mensajes"][] = $n["mensaje"];
+    $grupos[$fecha]["tipos"][]    = $n["tipo"];
+    $grupos[$fecha]["ids"][]      = $n["id_notificacion"];
+}
+
+krsort($grupos); // Ordenar como SQL ORDER DESC
 ?>
-
 
 <section class="admin-reservas">
 <h2 class="titulo-dashboard">🔔 Notificaciones del Administrador</h2>
@@ -93,33 +134,31 @@ body { background:#f5f9f5; font-family:"Poppins",sans-serif; }
 
 <div class="detalle-card">
 
-<?php if (pg_num_rows($result) > 0): ?>
+<?php if (!empty($grupos)): ?>
   <div style="text-align:right;">
     <a href="?borrar_todas=1" class="btn-borrar-todo" onclick="return confirm('¿Eliminar TODAS las notificaciones?');">🗑 Borrar todas</a>
   </div>
 
-  <?php while ($grupo = pg_fetch_assoc($result)):
-    $fecha = date("d/m/Y", strtotime($grupo['fecha']));
-    $titulos = explode('||', $grupo['titulos']);
-    $mensajes = explode('||', $grupo['mensajes']);
-    $tipos = explode('||', $grupo['tipos']);
-    $ids = explode(',', $grupo['ids']);
+  <?php foreach ($grupos as $fecha => $datos):
+      $fecha_formateada = date("d/m/Y", strtotime($fecha));
+      $count = count($datos["titulos"]);
   ?>
 
     <div class="acordeon-dia" onclick="toggleAcordeon(this)">
-      📅 <?= $fecha ?> (<?= count($titulos) ?>)
-    </div>
-    <div class="contenido-dia">
-      <?php foreach ($titulos as $i => $titulo): ?>
-        <div class="notificacion-card <?= htmlspecialchars($tipos[$i]) ?>">
-          <button class="borrar-btn" onclick="borrarNotificacion(<?= $ids[$i] ?>)">×</button>
-          <h4><?= htmlspecialchars($titulo) ?></h4>
-          <p><?= htmlspecialchars($mensajes[$i]) ?></p>
-        </div>
-      <?php endforeach; ?>
+      📅 <?= $fecha_formateada ?> (<?= $count ?>)
     </div>
 
-  <?php endwhile; ?>
+    <div class="contenido-dia">
+      <?php for ($i = 0; $i < $count; $i++): ?>
+        <div class="notificacion-card <?= htmlspecialchars($datos['tipos'][$i]) ?>">
+          <button class="borrar-btn" onclick="borrarNotificacion(<?= $datos['ids'][$i] ?>)">×</button>
+          <h4><?= htmlspecialchars($datos['titulos'][$i]) ?></h4>
+          <p><?= htmlspecialchars($datos['mensajes'][$i]) ?></p>
+        </div>
+      <?php endfor; ?>
+    </div>
+
+  <?php endforeach; ?>
 
 <?php else: ?>
   <p style="text-align:center; color:#666; margin-top:30px;">No hay notificaciones registradas 🌿.</p>

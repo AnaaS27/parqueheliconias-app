@@ -1,69 +1,92 @@
 <?php
-include('../includes/conexion.php');
-include('../includes/verificar_admin.php');
+require_once("../includes/supabase.php");
+require_once('../includes/verificar_admin.php');
 
-if (isset($_GET['id']) && isset($_GET['estado'])) {
-    $id_reserva = intval($_GET['id']);
-    $nuevo_estado = $_GET['estado'];
+// ===============================
+// Validar parámetros GET
+// ===============================
+if (!isset($_GET['id']) || !isset($_GET['estado'])) {
+    echo "<script>alert('Acceso no válido'); window.location='reservas.php';</script>";
+    exit;
+}
 
-    if (!in_array($nuevo_estado, ['pendiente', 'confirmada', 'cancelada'])) {
-        echo "<script>alert('❌ Estado no válido'); window.history.back();</script>";
-        exit;
-    }
+$id_reserva = intval($_GET['id']);
+$nuevo_estado = $_GET['estado'];
 
-    // 1️⃣ Obtener usuario dueño de la reserva
-    $sql_user = "SELECT id_usuario FROM reservas WHERE id_reserva = $1";
-    $result_user = pg_query_params($conn, $sql_user, [$id_reserva]);
+// Validar estado permitido
+if (!in_array($nuevo_estado, ['pendiente', 'confirmada', 'cancelada'])) {
+    echo "<script>alert('❌ Estado no válido'); window.history.back();</script>";
+    exit;
+}
 
-    if (!$result_user || pg_num_rows($result_user) === 0) {
-        echo "<script>alert('❌ La reserva no existe'); window.location='reservas.php';</script>";
-        exit;
-    }
+// ===============================
+// 1️⃣ Verificar que la reserva exista
+// ===============================
+list($codeReserva, $reservaData) = supabase_get("reservas", ["id_reserva" => $id_reserva]);
 
-    $row_user = pg_fetch_assoc($result_user);
-    $id_usuario = $row_user['id_usuario'];
+if ($codeReserva !== 200 || empty($reservaData)) {
+    echo "<script>alert('❌ La reserva no existe'); window.location='reservas.php';</script>";
+    exit;
+}
 
-    // 2️⃣ Actualizar estado
-    if ($nuevo_estado === 'cancelada') {
-        $sql_update = "UPDATE reservas SET estado = $1, fecha_cancelacion = NOW() WHERE id_reserva = $2";
-        $params = [$nuevo_estado, $id_reserva];
-    } else {
-        $sql_update = "UPDATE reservas SET estado = $1 WHERE id_reserva = $2";
-        $params = [$nuevo_estado, $id_reserva];
-    }
+// Obtener ID de usuario
+$id_usuario = $reservaData[0]["id_usuario"];
 
-    $result_update = pg_query_params($conn, $sql_update, $params);
+// ===============================
+// 2️⃣ Actualizar estado de la reserva
+// ===============================
+$updateData = ["estado" => $nuevo_estado];
 
-    if ($result_update) {
+if ($nuevo_estado === "cancelada") {
+    $updateData["fecha_cancelacion"] = date("Y-m-d H:i:s");
+}
 
-        // 3️⃣ Crear mensaje según estado
-        if ($nuevo_estado === 'confirmada') {
-            $titulo = '🎉 ¡Reserva Confirmada!';
-            $mensaje = 'Tu reserva ha sido confirmada. ¡Te esperamos en el Parque Las Heliconias!';
-            $tipo = 'exito';
-        } elseif ($nuevo_estado === 'cancelada') {
-            $titulo = '❌ Reserva Cancelada';
-            $mensaje = 'Tu reserva fue cancelada por administración.';
-            $tipo = 'error';
-        } else {
-            $titulo = 'ℹ️ Actualización de reserva';
-            $mensaje = 'Tu reserva ha cambiado de estado.';
-            $tipo = 'info';
-        }
+list($codeUpdate, $respUpdate) = supabase_update(
+    "reservas",
+    ["id_reserva" => $id_reserva],
+    $updateData
+);
 
-        // 4️⃣ Insertar notificación en Supabase
-        $sql_notif = "INSERT INTO notificaciones (id_usuario, id_reserva, titulo, mensaje, tipo, leida)
-                      VALUES ($1, $2, $3, $4, $5, false)";
+if ($codeUpdate !== 200 && $codeUpdate !== 204) {
+    echo "<script>alert('❌ Error al actualizar la reserva'); window.history.back();</script>";
+    exit;
+}
 
-        pg_query_params($conn, $sql_notif, [$id_usuario, $id_reserva, $titulo, $mensaje, $tipo]);
+// ===============================
+// 3️⃣ Crear notificación según el estado
+// ===============================
+if ($nuevo_estado === 'confirmada') {
+    $titulo = '🎉 ¡Reserva Confirmada!';
+    $mensaje = 'Tu reserva ha sido confirmada por administración. ¡Te esperamos!';
+    $tipo = 'exito';
 
-        echo "<script>alert('✅ Estado actualizado y notificación enviada'); window.location='reservas.php';</script>";
-        
-    } else {
-        echo "<script>alert('❌ Error al actualizar la reserva'); window.history.back();</script>";
-    }
+} elseif ($nuevo_estado === 'cancelada') {
+    $titulo = '❌ Reserva Cancelada';
+    $mensaje = 'Tu reserva ha sido cancelada por administración.';
+    $tipo = 'error';
 
 } else {
-    echo "<script>alert('Acceso no válido'); window.location='reservas.php';</script>";
+    $titulo = 'ℹ Actualización de reserva';
+    $mensaje = 'Tu reserva ha cambiado de estado.';
+    $tipo = 'info';
 }
+
+$notifData = [
+    "id_usuario"     => $id_usuario,
+    "id_reserva"     => $id_reserva,
+    "titulo"         => $titulo,
+    "mensaje"        => $mensaje,
+    "tipo"           => $tipo,
+    "leida"          => false,
+    "fecha_creacion" => date("Y-m-d H:i:s")
+];
+
+// Insertar notificación
+supabase_insert("notificaciones", $notifData);
+
+// ===============================
+// 4️⃣ Notificación visual final
+// ===============================
+echo "<script>alert('✅ Estado actualizado y notificación enviada'); window.location='reservas.php';</script>";
+exit;
 ?>

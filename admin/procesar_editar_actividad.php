@@ -1,50 +1,63 @@
 <?php
-include('../includes/conexion.php');
-include('../includes/verificar_admin.php');
+require_once("../includes/supabase.php"); // ← ÚNICA conexión a la BD
+require_once('../includes/verificar_admin.php');
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $id = intval($_POST['id_actividad']);
-    $nombre = trim($_POST['nombre']);
+    $id         = intval($_POST['id_actividad']);
+    $nombre     = trim($_POST['nombre']);
     $descripcion = trim($_POST['descripcion']);
-    $duracion = intval($_POST['duracion_minutos']);
-    $cupo = intval($_POST['cupo_maximo']);
-    $activo = ($_POST['activo'] == "1") ? 1 : 0;
+    $duracion   = intval($_POST['duracion_minutos']);
+    $cupo       = intval($_POST['cupo_maximo']);
+    $activo     = ($_POST['activo'] == "1") ? true : false;
 
     if (empty($nombre) || empty($descripcion) || $duracion <= 0 || $cupo <= 0) {
-        echo "<script>alert('⚠️ Todos los campos son obligatorios.'); window.history.back();</script>";
+        echo "<script>alert('⚠ Todos los campos son obligatorios.'); window.history.back();</script>";
         exit;
     }
 
-    // Actualizar actividad
-    $sql = "
-        UPDATE actividades 
-        SET nombre = $1, descripcion = $2, duracion_minutos = $3, cupo_maximo = $4, activo = $5 
-        WHERE id_actividad = $6
-    ";
+    // ============================================
+    // 📌 ACTUALIZAR ACTIVIDAD EN SUPABASE
+    // ============================================
 
-    $result = pg_query_params($conn, $sql, [$nombre, $descripcion, $duracion, $cupo, $activo, $id]);
+    $dataUpdate = [
+        "nombre"            => $nombre,
+        "descripcion"       => $descripcion,
+        "duracion_minutos"  => $duracion,
+        "cupo_maximo"       => $cupo,
+        "activo"            => $activo
+    ];
 
-    if ($result) {
+    list($codeUpdate, $respUpdate) = supabase_update(
+        "actividades",
+        ["id_actividad" => $id],
+        $dataUpdate
+    );
 
-        // Crear notificación global
-        $titulo = "🔄 Actividad actualizada";
-        $mensaje = "La actividad <b>$nombre</b> ha sido modificada. Consulta los nuevos detalles.";
-        $tipo = "info";
-
-        $sql_notificacion = "
-            INSERT INTO notificaciones (titulo, mensaje, tipo, id_usuario, id_reserva)
-            VALUES ($1, $2, $3, NULL, NULL)
-        ";
-
-        pg_query_params($conn, $sql_notificacion, [$titulo, $mensaje, $tipo]);
-
-        echo "<script>alert('✅ Actividad actualizada exitosamente'); window.location='actividades.php';</script>";
-    } else {
-        echo "<script>alert('❌ Error al actualizar la actividad'); window.history.back();</script>";
+    if ($codeUpdate !== 200 && $codeUpdate !== 204) {
+        echo "<script>alert('❌ Error al actualizar la actividad en Supabase'); window.history.back();</script>";
+        exit;
     }
 
-    pg_close($conn);
+    // ============================================
+    // 🔔 CREAR NOTIFICACIÓN GLOBAL EN SUPABASE
+    // ============================================
+
+    $titulo  = "🔄 Actividad actualizada";
+    $mensaje = "La actividad <b>$nombre</b> ha sido modificada. Consulta los nuevos detalles.";
+
+    $dataNotif = [
+        "titulo"     => $titulo,
+        "mensaje"    => $mensaje,
+        "tipo"       => "info",
+        "id_usuario" => null,
+        "id_reserva" => null
+    ];
+
+    // Insertar notificación
+    supabase_insert("notificaciones", $dataNotif);
+
+    echo "<script>alert('✅ Actividad actualizada exitosamente'); window.location='actividades.php';</script>";
+    exit;
 }
 ?>
-
