@@ -14,108 +14,97 @@ if (!$supabase_url || !$supabase_key) {
     die("❌ ERROR: Variables DATABASE_URL o SUPABASE_KEY no configuradas.");
 }
 
-// Normalizamos base URL
-$supabase_url = rtrim($supabase_url, '/');
+$supabase_url = rtrim($supabase_url, "/");
 
-if (!function_exists('supabase_get')) {
+/* ============================================================
+   🔥 GET AVANZADO — MANEJO DE PAGINACIÓN + Content-Range
+=============================================================== */
+function supabase_get($endpoint) {
+    global $supabase_url, $supabase_key;
 
-    /* ===============================
-       SELECT (GET)
-       =============================== */
-    function supabase_get($endpoint) {
-        global $supabase_url, $supabase_key;
+    $url = $supabase_url . "/rest/v1/" . ltrim($endpoint, "/");
 
-        $url = $supabase_url . "/rest/v1/" . ltrim($endpoint, '/');
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HEADER, true); // ⬅ LEER HEADERS también
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "apikey: $supabase_key",
+        "Authorization: Bearer $supabase_key",
+        "Accept: application/json",
+        "Content-Type: application/json",
+        "Prefer: count=exact" // ⬅ Muy importante para obtener total
+    ]);
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HEADER, true); // 🔥 LEER HEADERS
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "apikey: $supabase_key",
-            "Authorization: Bearer $supabase_key",
-            "Accept: application/json",
-            "Content-Type: application/json",
-            "Prefer: count=exact"
-        ]);
+    $response = curl_exec($ch);
+    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+    $headers = substr($response, 0, $headerSize);
+    $body = substr($response, $headerSize);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 
-        $response   = curl_exec($ch);
-        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        $headers    = substr($response, 0, $headerSize);
-        $body       = substr($response, $headerSize);
-        $code       = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+    curl_close($ch);
 
-        // Convertir JSON del body
-        $data = json_decode($body, true);
+    // Convertir body a JSON
+    $data = json_decode($body, true);
+    if (!is_array($data)) $data = [];
 
-        // 🔥 Extraer TOTAL desde Content-Range
-        $total = null;
-        if (preg_match('/Content-Range:\s*\d+-\d+\/(\d+)/i', $headers, $match)) {
-            $total = intval($match[1]);
-        }
-
-        return [
-            $code,
-            $data ?: [],
-            $total // 👉 ahora tienes el total correcto de registros
-        ];
+    // Buscar Content-Range
+    $total = null;
+    if (preg_match('/Content-Range:\s*\d+-\d+\/(\d+)/i', $headers, $match)) {
+        $total = intval($match[1]);
     }
 
-    /* ===============================
-       INSERT (POST)
-       =============================== */
-    function supabase_insert($table, $data) {
-        global $supabase_url, $supabase_key;
+    return [$code, $data, $total];
+}
 
-        $url = $supabase_url . "/rest/v1/" . $table;
+/* ============================================================
+   INSERT
+=============================================================== */
+function supabase_insert($table, $data) {
+    global $supabase_url, $supabase_key;
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "apikey: $supabase_key",
-            "Authorization: Bearer $supabase_key",
-            "Content-Type: application/json",
-            "Prefer: return=representation"
-        ]);
+    $url = $supabase_url . "/rest/v1/" . $table;
 
-        $response = curl_exec($ch);
-        $code     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "apikey: $supabase_key",
+        "Authorization: Bearer $supabase_key",
+        "Content-Type: application/json",
+        "Prefer: return=representation"
+    ]);
 
-        $data = json_decode($response, true);
+    $response = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
 
-        return [$code, $data];
-    }
+    return [$code, json_decode($response, true)];
+}
 
-    /* ===============================
-       UPDATE (PATCH)
-       endpoint ejemplo: "usuarios?id_usuario=eq.5"
-       =============================== */
-    function supabase_update($endpoint, $data) {
-        global $supabase_url, $supabase_key;
+/* ============================================================
+   UPDATE (PATCH)
+=============================================================== */
+function supabase_update($endpoint, $data) {
+    global $supabase_url, $supabase_key;
 
-        $url = $supabase_url . "/rest/v1/" . ltrim($endpoint, '/');
+    $url = $supabase_url . "/rest/v1/" . ltrim($endpoint, "/");
 
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PATCH");
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            "apikey: $supabase_key",
-            "Authorization: Bearer $supabase_key",
-            "Content-Type: application/json",
-            "Prefer: return=representation"
-        ]);
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "PATCH");
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        "apikey: $supabase_key",
+        "Authorization: Bearer $supabase_key",
+        "Content-Type: application/json",
+        "Prefer: return=representation"
+    ]);
 
-        $response = curl_exec($ch);
-        $code     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+    $response = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
 
-        $data = json_decode($response, true);
-
-        return [$code, $data];
-    }
+    return [$code, json_decode($response, true)];
 }
 ?>
