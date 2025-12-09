@@ -1,16 +1,17 @@
 <?php
 session_start();
 
-// ================================
-// 🔧 CONFIGURACIÓN SUPABASE
-// ================================
+// ===========================
+// CONFIG - SUPABASE
+// ===========================
 $supabase_url = getenv("DATABASE_URL");
 $supabase_key = getenv("SUPABASE_KEY");
 
+// Función para enviar datos a Supabase REST
 function supabase_post($endpoint, $data) {
     global $supabase_url, $supabase_key;
 
-    $url = rtrim($supabase_url, "/") . "/rest/v1/" . $endpoint;
+    $url = $supabase_url . "/rest/v1/" . $endpoint;
 
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -20,270 +21,118 @@ function supabase_post($endpoint, $data) {
         "apikey: $supabase_key",
         "Authorization: Bearer $supabase_key",
         "Content-Type: application/json",
-        "Prefer: return=representation"
+        "Prefer: return=representation"  // devuelve el usuario recién creado
     ]);
 
     $response = curl_exec($ch);
-    $status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    return [$status, json_decode($response, true)];
+    return [$code, json_decode($response, true)];
 }
 
+// ===========================
+// PROCESAR REGISTRO
+// ===========================
 
-// ================================
-// 🔄 PROCESAR PETICIÓN AJAX
-// ================================
-if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
-    $nombre     = trim($_POST["nombre"]);
-    $apellido   = trim($_POST["apellido"]);
-    $documento  = trim($_POST["documento"]);
-    $correo     = trim($_POST["correo"]);
-    $telefono   = trim($_POST["telefono"]);
-    $genero     = trim($_POST["genero"]);
-    $ciudad     = trim($_POST["ciudad"]);
-    $fecha_nac  = trim($_POST["fecha_nacimiento"]);
-    $password   = trim($_POST["password"]);
+    $nombre = $_POST["nombre"];
+    $apellido = $_POST["apellido"];
+    $correo = $_POST["correo"];
+    $documento = $_POST["documento"];
+    $telefono = $_POST["telefono"];
+    $contrasena = $_POST["contrasena"];
 
-    if (!$nombre || !$apellido || !$correo || !$documento || !$password) {
-        echo json_encode(["ok" => false, "msg" => "Todos los campos obligatorios deben llenarse."]);
+    // Validación simple
+    if (empty($nombre) || empty($apellido) || empty($correo) || empty($documento) || empty($contrasena)) {
+        $_SESSION["toast"] = ["tipo" => "warning", "mensaje" => "Todos los campos son obligatorios ⚠️"];
+        header("Location: registro.php");
         exit;
     }
 
-    // 🔍 Verificar si correo existe
-    $query = "usuarios?correo=eq." . urlencode($correo);
-    $query = str_replace("+", "%20", $query);
+    // 1 — Verificar si el correo ya existe
+    $url = "usuarios?correo=eq." . urlencode($correo) . "&select=id_usuario";
+    $url_encoded = str_replace("+", "%20", $url);
 
-    $ch = curl_init($supabase_url . "/rest/v1/" . $query);
+    $ch = curl_init($supabase_url . "/rest/v1/" . $url_encoded);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "apikey: $supabase_key",
-        "Authorization: Bearer $supabase_key"
+        "Authorization: Bearer $supabase_key",
+        "Content-Type: application/json"
     ]);
 
-    $exists = json_decode(curl_exec($ch), true);
+    $existing = json_decode(curl_exec($ch), true);
     curl_close($ch);
 
-    if (!empty($exists)) {
-        echo json_encode(["ok" => false, "msg" => "El correo ya existe en el sistema."]);
+    if (!empty($existing)) {
+        $_SESSION["toast"] = ["tipo" => "error", "mensaje" => "El correo ya está registrado ❌"];
+        header("Location: registro.php");
         exit;
     }
 
-    // 🔐 Hash contraseña
-    $hash = password_hash($password, PASSWORD_BCRYPT);
+    // 2 — Encriptar contraseña (bcrypt)
+    $password_hash = password_hash($contrasena, PASSWORD_BCRYPT);
 
-    // ➕ Insertar usuario
-    [$status, $insert] = supabase_post("usuarios", [
-        "nombre"        => $nombre,
-        "apellido"      => $apellido,
-        "correo"        => $correo,
-        "documento"     => $documento,
-        "telefono"      => $telefono,
-        "genero"        => $genero,
-        "ciudad"        => $ciudad,
-        "fecha_nac"     => $fecha_nac,
-        "contrasena"    => $hash,
-        "id_rol"        => 2,
-        "usuario_activo"=> true,
-        "fecha_registro"=> date("c")
+    // 3 — Insertar usuario por REST
+    [$status, $data] = supabase_post("usuarios", [
+        "nombre" => $nombre,
+        "apellido" => $apellido,
+        "correo" => $correo,
+        "documento" => $documento,
+        "telefono" => $telefono,
+        "contrasena" => $password_hash,
+        "id_rol" => 2, // usuario normal
+        "usuario_activo" => true,
+        "fecha_registro" => date("c")
     ]);
 
-    echo json_encode([
-        "ok"  => $status === 201,
-        "msg" => $status === 201 ? "Registro exitoso." : "Error registrando usuario."
-    ]);
-    exit;
+    // 4 — Ver resultado
+    if ($status === 201) {
+        $_SESSION["toast"] = [
+            "tipo" => "success",
+            "mensaje" => "¡Registro exitoso! Ahora puedes iniciar sesión 🌿"
+        ];
+        header("Location: login.php");
+        exit;
+    } else {
+        $_SESSION["toast"] = [
+            "tipo" => "error",
+            "mensaje" => "Error al registrar usuario ❌"
+        ];
+        header("Location: registro.php");
+        exit;
+    }
 }
 ?>
+
+<!-- AQUI SIGUE TU HTML DE REGISTRO NORMAL --> 
+
+
 
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Registrarse - Parque Las Heliconias</title>
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" href="../assets/img/logoo.png">
-
-    <!-- TAILWIND CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+<meta charset="UTF-8">
+<title>Registro - Parque Las Heliconias</title>
+<link rel="stylesheet" href="../assets/css/estilos.css">
 </head>
-
-<body class="bg-green-50 min-h-screen flex items-center justify-center p-4">
-
-<!-- 🟢 Toast → Notificación -->
-<div id="toast" class="fixed top-5 right-5 z-50 hidden px-4 py-3 rounded-lg shadow-lg text-white"></div>
-
-<!-- 🟢 Tarjeta de registro -->
-<div class="bg-white shadow-2xl rounded-2xl p-10 w-full max-w-2xl border border-green-200">
-
-    <h2 class="text-3xl font-bold text-center text-green-700 mb-8">
-        🌿 Crear Cuenta
-    </h2>
-
-    <form id="registerForm" class="space-y-5">
-
-        <!-- Nombre / Apellido -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="text-gray-700 font-medium">Nombre *</label>
-                <input type="text" name="nombre" required
-                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-            </div>
-
-            <div>
-                <label class="text-gray-700 font-medium">Apellido *</label>
-                <input type="text" name="apellido" required
-                       class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-            </div>
-        </div>
-
-        <!-- Documento -->
-        <div>
-            <label class="text-gray-700 font-medium">Documento de identidad *</label>
-            <input type="number" name="documento" required
-                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-        </div>
-
-        <!-- Email -->
-        <div>
-            <label class="text-gray-700 font-medium">Correo electrónico *</label>
-            <input type="email" name="correo" required
-                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-        </div>
-
-        <!-- Teléfono -->
-        <div>
-            <label class="text-gray-700 font-medium">Teléfono (opcional)</label>
-            <input type="tel" name="telefono"
-                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-        </div>
-
-        <!-- Fecha Nacimiento -->
-        <div>
-            <label class="text-gray-700 font-medium">Fecha de nacimiento *</label>
-            <input type="date" name="fecha_nacimiento" required
-                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-        </div>
-
-        <!-- Género / Ciudad -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-                <label class="text-gray-700 font-medium">Género *</label>
-                <select name="genero" required
-                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-                    <option value="">Seleccione</option>
-                    <option>Femenino</option>
-                    <option>Masculino</option>
-                    <option>Otro</option>
-                </select>
-            </div>
-
-            <div>
-                <label class="text-gray-700 font-medium">Ciudad *</label>
-                <select name="ciudad" required
-                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-                    <option value="">Seleccione</option>
-                    <option>Pereira</option>
-                    <option>Dosquebradas</option>
-                    <option>Manizales</option>
-                </select>
-            </div>
-        </div>
-
-        <!-- Contraseña -->
-        <div>
-            <label class="text-gray-700 font-medium">Contraseña *</label>
-            <input type="password" name="password" minlength="6" required
-                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-        </div>
-
-        <!-- Confirmar contraseña -->
-        <div>
-            <label class="text-gray-700 font-medium">Confirmar contraseña *</label>
-            <input type="password" name="confirmPassword" minlength="6" required
-                   class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500">
-        </div>
-
-        <!-- Botón -->
-        <button type="submit"
-                id="registerBtn"
-                class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition flex items-center justify-center gap-2">
-
-            <span>Registrarme</span>
-
-            <div id="loadingSpinner"
-                 class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin">
-            </div>
-        </button>
-
-        <p class="text-center text-gray-600 text-sm mt-3">
-            ¿Ya tienes cuenta?
-            <a href="login.php" class="text-green-700 font-medium hover:underline">Inicia sesión</a><br>
-            <a href="index.php" class="text-green-700 font-medium hover:underline">Volver al inicio</a>
-        </p>
-
+<body class="fondo-verde">
+<div class="contenedor-login">
+    <img src="../assets/img/logo.png" class="logo" alt="Logo Parque Las Heliconias">
+    <h2>Registro de Visitante</h2>
+    <?php if (!empty($error)) echo "<p class='error'>$error</p>"; ?>
+    <form method="POST">
+        <input type="text" name="nombre" placeholder="Nombre" required>
+        <input type="text" name="apellido" placeholder="Apellido" required>
+        <input type="email" name="correo" placeholder="Correo electrónico" required>
+        <input type="text" name="documento" placeholder="Documento de identidad" required>
+        <input type="text" name="telefono" placeholder="Teléfono" required>
+        <input type="password" name="contrasena" placeholder="Contraseña" required>
+        <button type="submit">Registrarse</button>
+        <p>¿Ya tienes cuenta? <a href="login.php">Inicia sesión</a></p>
     </form>
 </div>
-
-<!-- 🟢 Notificaciones -->
-<script>
-function mostrarNotificacion(tipo, mensaje) {
-    const toast = document.getElementById("toast");
-
-    toast.className =
-        "px-4 py-3 rounded-lg shadow-lg text-white fixed top-5 right-5 " +
-        (tipo === "success" ? "bg-green-600" : "bg-red-600");
-
-    toast.textContent = mensaje;
-    toast.classList.remove("hidden");
-
-    setTimeout(() => toast.classList.add("hidden"), 3000);
-}
-</script>
-
-
-<!-- 🟢 Enviar formulario AJAX -->
-<script>
-document.getElementById("registerForm").addEventListener("submit", async function(e){
-    e.preventDefault();
-
-    const pass = this.password.value;
-    const conf = this.confirmPassword.value;
-
-    if (pass !== conf) {
-        mostrarNotificacion("error", "Las contraseñas no coinciden");
-        return;
-    }
-
-    const btn = document.getElementById("registerBtn");
-    const spinner = document.getElementById("loadingSpinner");
-
-    btn.disabled = true;
-    spinner.classList.remove("hidden");
-
-    const formData = new FormData(this);
-    formData.append("ajax", "1");
-
-    const req = await fetch("registro.php", {
-        method: "POST",
-        body: formData
-    });
-
-    const res = await req.json();
-
-    btn.disabled = false;
-    spinner.classList.add("hidden");
-
-    if (res.ok) {
-        mostrarNotificacion("success", "Registro exitoso, redirigiendo...");
-        setTimeout(() => window.location = "login.php", 1500);
-    } else {
-        mostrarNotificacion("error", res.msg);
-    }
-});
-</script>
-
 </body>
 </html>
