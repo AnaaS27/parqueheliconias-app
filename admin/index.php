@@ -1,5 +1,7 @@
-<?php include('header_admin.php'); ?>
-<?php include('../includes/supabase.php'); ?>
+<?php 
+include('header_admin.php'); 
+require_once('../includes/supabase.php'); 
+?>
 
 <?php
 // ========================================
