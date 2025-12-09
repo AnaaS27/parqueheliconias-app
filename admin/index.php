@@ -1,49 +1,52 @@
 <?php 
 include('header_admin.php'); 
 require_once('../includes/supabase.php'); 
-?>
 
-<?php
-// ========================================
-// 🔢 CONTADOR: ACTIVIDADES
-// ========================================
-list($codeAct, $resAct) = supabase_get("actividades?select=count:id");
+/* ======================================================
+   🔢 1) ACTIVIDADES — Conteo manual
+====================================================== */
+list($codeAct, $actividades) = supabase_get("actividades?select=id_actividad");
 
-$total_actividades = ($codeAct === 200 && !empty($resAct))
-    ? intval($resAct[0]['count'])
+$total_actividades = ($codeAct === 200 && is_array($actividades))
+    ? count($actividades)
     : 0;
 
+/* ======================================================
+   🔢 2) RESERVAS TOTALES — Conteo manual
+====================================================== */
+list($codeRes, $reservas) = supabase_get("reservas?select=id_reserva");
 
-// ========================================
-// 🔢 CONTADOR: RESERVAS TOTALES
-// ========================================
-list($codeRes, $resReservas) = supabase_get("reservas?select=count:id");
-
-$total_reservas = ($codeRes === 200 && !empty($resReservas))
-    ? intval($resReservas[0]['count'])
+$total_reservas = ($codeRes === 200 && is_array($reservas))
+    ? count($reservas)
     : 0;
 
+/* ======================================================
+   🔢 3) USUARIOS ACTIVOS — Conteo manual
+====================================================== */
+list($codeUsers, $usuarios) = supabase_get("usuarios?select=id_usuario,usuario_activo");
 
-// ========================================
-// 🔢 CONTADOR: USUARIOS ACTIVOS
-// ========================================
-list($codeUsers, $resUsers) = supabase_get("usuarios?usuario_activo=eq.true&select=count:id");
+$total_usuarios = 0;
+if ($codeUsers === 200 && is_array($usuarios)) {
+    foreach ($usuarios as $u) {
+        if (!empty($u["usuario_activo"])) {
+            $total_usuarios++;
+        }
+    }
+}
 
-$total_usuarios = ($codeUsers === 200 && !empty($resUsers))
-    ? intval($resUsers[0]['count'])
-    : 0;
+/* ======================================================
+   🔢 4) RESERVAS PENDIENTES — Conteo manual
+====================================================== */
+list($codePend, $resPend) = supabase_get("reservas?select=id_reserva,estado");
 
-
-// ========================================
-// 🔢 CONTADOR: RESERVAS PENDIENTES
-// ========================================
-$estado = urlencode("pendiente");
-list($codePend, $resPend) = supabase_get("reservas?estado=eq.$estado&select=count:id");
-
-$reservas_pendientes = ($codePend === 200 && !empty($resPend))
-    ? intval($resPend[0]['count'])
-    : 0;
-
+$reservas_pendientes = 0;
+if ($codePend === 200 && is_array($resPend)) {
+    foreach ($resPend as $r) {
+        if ($r["estado"] === "pendiente") {
+            $reservas_pendientes++;
+        }
+    }
+}
 ?>
 
 <section class="admin-dashboard">
