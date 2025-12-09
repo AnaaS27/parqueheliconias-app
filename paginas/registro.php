@@ -7,7 +7,6 @@ session_start();
 $supabase_url = getenv("DATABASE_URL");
 $supabase_key = getenv("SUPABASE_KEY");
 
-// Función para enviar datos a Supabase REST
 function supabase_post($endpoint, $data) {
     global $supabase_url, $supabase_key;
 
@@ -21,7 +20,7 @@ function supabase_post($endpoint, $data) {
         "apikey: $supabase_key",
         "Authorization: Bearer $supabase_key",
         "Content-Type: application/json",
-        "Prefer: return=representation"  // devuelve el usuario recién creado
+        "Prefer: return=representation"
     ]);
 
     $response = curl_exec($ch);
@@ -32,107 +31,214 @@ function supabase_post($endpoint, $data) {
 }
 
 // ===========================
-// PROCESAR REGISTRO
+// PROCESAR FORMULARIO POST (AJAX)
 // ===========================
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $nombre     = trim($_POST["nombre"]);
+    $apellido   = trim($_POST["apellido"]);
+    $documento  = trim($_POST["documento"]);
+    $correo     = trim($_POST["correo"]);
+    $telefono   = trim($_POST["telefono"]);
+    $genero     = trim($_POST["genero"]);
+    $ciudad     = trim($_POST["ciudad"]);
+    $fecha_nac  = trim($_POST["fecha_nacimiento"]);
+    $password   = trim($_POST["password"]);
 
-    $nombre = $_POST["nombre"];
-    $apellido = $_POST["apellido"];
-    $correo = $_POST["correo"];
-    $documento = $_POST["documento"];
-    $telefono = $_POST["telefono"];
-    $contrasena = $_POST["contrasena"];
-
-    // Validación simple
-    if (empty($nombre) || empty($apellido) || empty($correo) || empty($documento) || empty($contrasena)) {
-        $_SESSION["toast"] = ["tipo" => "warning", "mensaje" => "Todos los campos son obligatorios ⚠️"];
-        header("Location: registro.php");
+    if (!$nombre || !$apellido || !$correo || !$documento || !$password) {
+        echo json_encode(["ok" => false, "msg" => "Todos los campos obligatorios deben llenarse."]);
         exit;
     }
 
-    // 1 — Verificar si el correo ya existe
-    $url = "usuarios?correo=eq." . urlencode($correo) . "&select=id_usuario";
-    $url_encoded = str_replace("+", "%20", $url);
+    // Verificar correo existente
+    $query = "usuarios?correo=eq." . urlencode($correo);
+    $query = str_replace("+", "%20", $query);
 
-    $ch = curl_init($supabase_url . "/rest/v1/" . $url_encoded);
+    $ch = curl_init($supabase_url . "/rest/v1/" . $query);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "apikey: $supabase_key",
-        "Authorization: Bearer $supabase_key",
-        "Content-Type: application/json"
+        "Authorization: Bearer $supabase_key"
     ]);
 
-    $existing = json_decode(curl_exec($ch), true);
+    $exists = json_decode(curl_exec($ch), true);
     curl_close($ch);
 
-    if (!empty($existing)) {
-        $_SESSION["toast"] = ["tipo" => "error", "mensaje" => "El correo ya está registrado ❌"];
-        header("Location: registro.php");
+    if (!empty($exists)) {
+        echo json_encode(["ok" => false, "msg" => "El correo ya existe en el sistema."]);
         exit;
     }
 
-    // 2 — Encriptar contraseña (bcrypt)
-    $password_hash = password_hash($contrasena, PASSWORD_BCRYPT);
+    // Encriptar
+    $hash = password_hash($password, PASSWORD_BCRYPT);
 
-    // 3 — Insertar usuario por REST
-    [$status, $data] = supabase_post("usuarios", [
-        "nombre" => $nombre,
-        "apellido" => $apellido,
-        "correo" => $correo,
-        "documento" => $documento,
-        "telefono" => $telefono,
-        "contrasena" => $password_hash,
-        "id_rol" => 2, // usuario normal
-        "usuario_activo" => true,
-        "fecha_registro" => date("c")
+    [$status, $insert] = supabase_post("usuarios", [
+        "nombre"        => $nombre,
+        "apellido"      => $apellido,
+        "correo"        => $correo,
+        "documento"     => $documento,
+        "telefono"      => $telefono,
+        "genero"        => $genero,
+        "ciudad"        => $ciudad,
+        "fecha_nac"     => $fecha_nac,
+        "contrasena"    => $hash,
+        "id_rol"        => 2,
+        "usuario_activo"=> true,
+        "fecha_registro"=> date("c")
     ]);
 
-    // 4 — Ver resultado
     if ($status === 201) {
-        $_SESSION["toast"] = [
-            "tipo" => "success",
-            "mensaje" => "¡Registro exitoso! Ahora puedes iniciar sesión 🌿"
-        ];
-        header("Location: login.php");
-        exit;
+        echo json_encode(["ok" => true, "msg" => "Registro exitoso."]);
     } else {
-        $_SESSION["toast"] = [
-            "tipo" => "error",
-            "mensaje" => "Error al registrar usuario ❌"
-        ];
-        header("Location: registro.php");
-        exit;
+        echo json_encode(["ok" => false, "msg" => "Error registrando usuario."]);
     }
+
+    exit;
 }
 ?>
 
-<!-- AQUI SIGUE TU HTML DE REGISTRO NORMAL --> 
-
-
+<!-- ============================
+      🔥 FORMULARIO MODERNO
+============================= -->
 
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<title>Registro - Parque Las Heliconias</title>
-<link rel="stylesheet" href="../assets/css/estilos.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrarse - Parque Las Heliconias</title>
+
+    <link rel="icon" href="../assets/img/logoo.png">
+
+    <!-- Tus estilos -->
+    <link rel="stylesheet" href="css/notificacion.css">
+    <link rel="stylesheet" href="css/register.css">
+
 </head>
-<body class="fondo-verde">
-<div class="contenedor-login">
-    <img src="../assets/img/logo.png" class="logo" alt="Logo Parque Las Heliconias">
-    <h2>Registro de Visitante</h2>
-    <?php if (!empty($error)) echo "<p class='error'>$error</p>"; ?>
-    <form method="POST">
-        <input type="text" name="nombre" placeholder="Nombre" required>
-        <input type="text" name="apellido" placeholder="Apellido" required>
-        <input type="email" name="correo" placeholder="Correo electrónico" required>
-        <input type="text" name="documento" placeholder="Documento de identidad" required>
-        <input type="text" name="telefono" placeholder="Teléfono" required>
-        <input type="password" name="contrasena" placeholder="Contraseña" required>
-        <button type="submit">Registrarse</button>
-        <p>¿Ya tienes cuenta? <a href="login.php">Inicia sesión</a></p>
-    </form>
-</div>
+<body>
+
+    <div class="register-container">
+        <div class="register-form">
+            <h2>Crear Cuenta</h2>
+
+            <form id="registerForm">
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Nombre:</label>
+                        <input type="text" name="nombre" required placeholder="Tu nombre">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Apellido:</label>
+                        <input type="text" name="apellido" required placeholder="Tu apellido">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Documento de identidad:</label>
+                    <input type="number" name="documento" required placeholder="Tu documento">
+                </div>
+
+                <div class="form-group">
+                    <label>Correo electrónico:</label>
+                    <input type="email" name="correo" required placeholder="ejemplo@correo.com">
+                </div>
+
+                <div class="form-group">
+                    <label>Teléfono (opcional):</label>
+                    <input type="tel" name="telefono" placeholder="Teléfono">
+                </div>
+
+                <div class="form-group">
+                    <label>Fecha nacimiento:</label>
+                    <input type="date" name="fecha_nacimiento" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Género:</label>
+                        <select name="genero" required>
+                            <option value="">Seleccione</option>
+                            <option value="Femenino">Femenino</option>
+                            <option value="Masculino">Masculino</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ciudad:</label>
+                        <select name="ciudad" required>
+                            <option value="">Seleccione</option>
+                            <option value="Pereira">Pereira</option>
+                            <option value="Dosquebradas">Dosquebradas</option>
+                            <option value="Manizales">Manizales</option>
+                            <!-- Puedes cargar dinámico con AJAX -->
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Contraseña:</label>
+                    <input type="password" name="password" required minlength="6" placeholder="Mínimo 6 caracteres">
+                </div>
+
+                <div class="form-group">
+                    <label>Confirmar contraseña:</label>
+                    <input type="password" name="confirmPassword" required minlength="6" placeholder="Repite tu contraseña">
+                </div>
+
+                <button type="submit" class="register-btn" id="registerBtn">
+                    <span class="btn-text">Registrarme</span>
+                    <div class="loading-spinner" id="loadingSpinner"></div>
+                </button>
+
+                <div class="login-link">
+                    ¿Ya tienes cuenta?
+                    <a href="login.php">Inicia sesión</a><br>
+                    <a href="index.php">Volver al inicio</a>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+<script src="js/notificacion.js"></script>
+
+<script>
+// =========================
+//   Envío AJAX moderno
+// =========================
+document.getElementById("registerForm").addEventListener("submit", async function(e){
+    e.preventDefault();
+
+    const btn = document.getElementById("registerBtn");
+    const spinner = document.getElementById("loadingSpinner");
+    btn.disabled = true;
+    spinner.style.display = "inline-block";
+
+    const formData = new FormData(this);
+    formData.append("ajax", "1");
+
+    const req = await fetch("registro.php", {
+        method: "POST",
+        body: formData
+    });
+
+    const res = await req.json();
+
+    btn.disabled = false;
+    spinner.style.display = "none";
+
+    if (res.ok) {
+        mostrarNotificacion("success", "Registro exitoso, redirigiendo...");
+        setTimeout(() => window.location = "login.php", 1500);
+    } else {
+        mostrarNotificacion("error", res.msg);
+    }
+
+});
+</script>
+
 </body>
 </html>

@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once('../includes/verificar_sesion_admin.php');
+require_once('../includes/verificar_admin.php');
 require_once("../includes/supabase.php"); // ← ÚNICA conexión válida
 
 // --- Validar datos recibidos ---
