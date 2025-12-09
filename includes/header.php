@@ -62,9 +62,6 @@ if (isset($_SESSION['usuario_id'])) {
 }
 ?>
 
-<!-- 🔗 TAILWIND (solo aquí, nunca en footer) -->
-<script src="https://cdn.tailwindcss.com"></script>
-
 <!-- 🔗 CSS DEL HEADER -->
 <link rel="stylesheet" href="<?= $rutaBase ?>assets/css/header.css">
 

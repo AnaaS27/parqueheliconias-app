@@ -88,6 +88,7 @@ supabase_update("notificaciones?id_usuario=eq.$id_usuario", ["leida" => true]);
 <head>
 <meta charset="UTF-8">
 <title>Mis Notificaciones</title>
+<script src="https://cdn.tailwindcss.com"></script>
 </head>
 
 <body class="bg-gray-100">

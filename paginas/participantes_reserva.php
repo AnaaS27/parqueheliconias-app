@@ -218,6 +218,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 <head>
 <meta charset="UTF-8">
 <title>Reserva Grupal</title>
+<script src="https://cdn.tailwindcss.com"></script>
 
 <style>
 /* Animación suave de transición */

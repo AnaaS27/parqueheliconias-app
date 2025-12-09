@@ -1,16 +1,16 @@
 <?php
 session_start();
 
-// ===========================
-// CONFIG - SUPABASE
-// ===========================
+// ================================
+// 🔧 CONFIGURACIÓN SUPABASE
+// ================================
 $supabase_url = getenv("DATABASE_URL");
 $supabase_key = getenv("SUPABASE_KEY");
 
 function supabase_post($endpoint, $data) {
     global $supabase_url, $supabase_key;
 
-    $url = $supabase_url . "/rest/v1/" . $endpoint;
+    $url = rtrim($supabase_url, "/") . "/rest/v1/" . $endpoint;
 
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -24,15 +24,15 @@ function supabase_post($endpoint, $data) {
     ]);
 
     $response = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $status   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    return [$code, json_decode($response, true)];
+    return [$status, json_decode($response, true)];
 }
 
-// ===========================
-// PROCESAR FORMULARIO POST (AJAX)
-// ===========================
+// ================================
+// 🔄 PROCESAR PETICIÓN AJAX
+// ================================
 if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
 
     $nombre     = trim($_POST["nombre"]);
@@ -50,7 +50,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
         exit;
     }
 
-    // Verificar correo existente
+    // ================================
+    // 🔍 Verificar si el correo existe
+    // ================================
     $query = "usuarios?correo=eq." . urlencode($correo);
     $query = str_replace("+", "%20", $query);
 
@@ -69,9 +71,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
         exit;
     }
 
-    // Encriptar
+    // ================================
+    // 🔐 Encriptar contraseña
+    // ================================
     $hash = password_hash($password, PASSWORD_BCRYPT);
 
+    // ================================
+    // ➕ Insertar usuario
+    // ================================
     [$status, $insert] = supabase_post("usuarios", [
         "nombre"        => $nombre,
         "apellido"      => $apellido,
@@ -97,10 +104,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
 }
 ?>
 
-<!-- ======================================================
-               FORMULARIO MODERNO CON TAILWIND
-======================================================= -->
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -108,15 +111,15 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
     <title>Registrarse - Parque Las Heliconias</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-
     <link rel="icon" href="../assets/img/logoo.png">
-
 </head>
+
 <body class="bg-green-50 min-h-screen flex items-center justify-center p-4">
 
-<!-- Notificación -->
+<!-- 🟢 Notificación flotante -->
 <div id="toast" class="fixed top-5 right-5 z-50 hidden"></div>
 
+<!-- 🟢 Tarjeta de registro -->
 <div class="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-2xl">
 
     <h2 class="text-3xl font-bold text-center text-green-700 mb-6">
@@ -125,49 +128,47 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
 
     <form id="registerForm" class="space-y-5">
 
-        <!-- NOMBRE / APELLIDO -->
+        <!-- Nombre / Apellido -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                <input type="text" name="nombre" required
-                       class="input-box">
+                <label class="label">Nombre</label>
+                <input type="text" name="nombre" required class="input-box">
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
-                <input type="text" name="apellido" required
-                       class="input-box">
+                <label class="label">Apellido</label>
+                <input type="text" name="apellido" required class="input-box">
             </div>
         </div>
 
-        <!-- DOCUMENTO -->
+        <!-- Documento -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Documento de identidad</label>
+            <label class="label">Documento de identidad</label>
             <input type="number" name="documento" required class="input-box">
         </div>
 
-        <!-- EMAIL -->
+        <!-- Email -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+            <label class="label">Correo electrónico</label>
             <input type="email" name="correo" required class="input-box">
         </div>
 
-        <!-- TELÉFONO -->
+        <!-- Teléfono -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono (opcional)</label>
+            <label class="label">Teléfono (opcional)</label>
             <input type="tel" name="telefono" class="input-box">
         </div>
 
-        <!-- FECHA NAC -->
+        <!-- Fecha Nacimiento -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
+            <label class="label">Fecha de nacimiento</label>
             <input type="date" name="fecha_nacimiento" required class="input-box">
         </div>
 
-        <!-- GÉNERO / CIUDAD -->
+        <!-- Género / Ciudad -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Género</label>
+                <label class="label">Género</label>
                 <select name="genero" required class="input-box">
                     <option value="">Seleccione</option>
                     <option value="Femenino">Femenino</option>
@@ -177,7 +178,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
+                <label class="label">Ciudad</label>
                 <select name="ciudad" required class="input-box">
                     <option value="">Seleccione</option>
                     <option value="Pereira">Pereira</option>
@@ -187,24 +188,26 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
             </div>
         </div>
 
-        <!-- PASSWORD -->
+        <!-- Contraseña -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+            <label class="label">Contraseña</label>
             <input type="password" name="password" required minlength="6" class="input-box">
         </div>
 
-        <!-- CONFIRM PASSWORD -->
+        <!-- Confirmar contraseña -->
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar contraseña</label>
+            <label class="label">Confirmar contraseña</label>
             <input type="password" name="confirmPassword" required minlength="6" class="input-box">
         </div>
 
-        <!-- BOTÓN -->
+        <!-- Botón -->
         <button type="submit"
-                id="registerBtn"
-                class="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+            id="registerBtn"
+            class="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+            
             <span>Registrarme</span>
-            <div id="loadingSpinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            <div id="loadingSpinner"
+                 class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
         </button>
 
         <p class="text-center text-gray-600 text-sm mt-3">
@@ -212,18 +215,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
             <a href="login.php" class="text-green-700 hover:underline font-medium">Inicia sesión</a><br>
             <a href="index.php" class="text-green-700 hover:underline font-medium">Volver al inicio</a>
         </p>
-
     </form>
 </div>
 
-<!-- ========== TAILWIND INPUT BOX STYLE ========== -->
+<!-- 🟢 ESTILOS INPUT -->
 <style>
+.label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+}
 .input-box {
     @apply w-full px-3 py-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition;
 }
 </style>
 
-<!-- ========== NOTIFICACIONES ========== -->
+<!-- 🟢 Notificaciones -->
 <script>
 function mostrarNotificacion(tipo, mensaje) {
     const toast = document.getElementById("toast");
@@ -239,7 +244,7 @@ function mostrarNotificacion(tipo, mensaje) {
 }
 </script>
 
-<!-- ========== SUBMIT AJAX ========== -->
+<!-- 🟢 Enviar formulario AJAX -->
 <script>
 document.getElementById("registerForm").addEventListener("submit", async function(e){
     e.preventDefault();
