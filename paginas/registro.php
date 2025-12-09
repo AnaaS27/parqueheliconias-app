@@ -97,125 +97,168 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
 }
 ?>
 
-<!-- ============================
-      🔥 FORMULARIO MODERNO
-============================= -->
+<!-- ======================================================
+               FORMULARIO MODERNO CON TAILWIND
+======================================================= -->
 
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registrarse - Parque Las Heliconias</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- TAILWIND CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
 
     <link rel="icon" href="../assets/img/logoo.png">
 
-    <!-- Tus estilos -->
-    <link rel="stylesheet" href="css/notificacion.css">
-    <link rel="stylesheet" href="css/register.css">
-
 </head>
-<body>
+<body class="bg-green-50 min-h-screen flex items-center justify-center p-4">
 
-    <div class="register-container">
-        <div class="register-form">
-            <h2>Crear Cuenta</h2>
+<!-- Notificación -->
+<div id="toast" class="fixed top-5 right-5 z-50 hidden"></div>
 
-            <form id="registerForm">
+<div class="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-2xl">
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Nombre:</label>
-                        <input type="text" name="nombre" required placeholder="Tu nombre">
-                    </div>
+    <h2 class="text-3xl font-bold text-center text-green-700 mb-6">
+        🌿 Crear Cuenta
+    </h2>
 
-                    <div class="form-group">
-                        <label>Apellido:</label>
-                        <input type="text" name="apellido" required placeholder="Tu apellido">
-                    </div>
-                </div>
+    <form id="registerForm" class="space-y-5">
 
-                <div class="form-group">
-                    <label>Documento de identidad:</label>
-                    <input type="number" name="documento" required placeholder="Tu documento">
-                </div>
+        <!-- NOMBRE / APELLIDO -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                <input type="text" name="nombre" required
+                       class="input-box">
+            </div>
 
-                <div class="form-group">
-                    <label>Correo electrónico:</label>
-                    <input type="email" name="correo" required placeholder="ejemplo@correo.com">
-                </div>
-
-                <div class="form-group">
-                    <label>Teléfono (opcional):</label>
-                    <input type="tel" name="telefono" placeholder="Teléfono">
-                </div>
-
-                <div class="form-group">
-                    <label>Fecha nacimiento:</label>
-                    <input type="date" name="fecha_nacimiento" required>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Género:</label>
-                        <select name="genero" required>
-                            <option value="">Seleccione</option>
-                            <option value="Femenino">Femenino</option>
-                            <option value="Masculino">Masculino</option>
-                            <option value="Otro">Otro</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Ciudad:</label>
-                        <select name="ciudad" required>
-                            <option value="">Seleccione</option>
-                            <option value="Pereira">Pereira</option>
-                            <option value="Dosquebradas">Dosquebradas</option>
-                            <option value="Manizales">Manizales</option>
-                            <!-- Puedes cargar dinámico con AJAX -->
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>Contraseña:</label>
-                    <input type="password" name="password" required minlength="6" placeholder="Mínimo 6 caracteres">
-                </div>
-
-                <div class="form-group">
-                    <label>Confirmar contraseña:</label>
-                    <input type="password" name="confirmPassword" required minlength="6" placeholder="Repite tu contraseña">
-                </div>
-
-                <button type="submit" class="register-btn" id="registerBtn">
-                    <span class="btn-text">Registrarme</span>
-                    <div class="loading-spinner" id="loadingSpinner"></div>
-                </button>
-
-                <div class="login-link">
-                    ¿Ya tienes cuenta?
-                    <a href="login.php">Inicia sesión</a><br>
-                    <a href="index.php">Volver al inicio</a>
-                </div>
-
-            </form>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Apellido</label>
+                <input type="text" name="apellido" required
+                       class="input-box">
+            </div>
         </div>
-    </div>
 
-<script src="js/notificacion.js"></script>
+        <!-- DOCUMENTO -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Documento de identidad</label>
+            <input type="number" name="documento" required class="input-box">
+        </div>
 
+        <!-- EMAIL -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
+            <input type="email" name="correo" required class="input-box">
+        </div>
+
+        <!-- TELÉFONO -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Teléfono (opcional)</label>
+            <input type="tel" name="telefono" class="input-box">
+        </div>
+
+        <!-- FECHA NAC -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Fecha de nacimiento</label>
+            <input type="date" name="fecha_nacimiento" required class="input-box">
+        </div>
+
+        <!-- GÉNERO / CIUDAD -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Género</label>
+                <select name="genero" required class="input-box">
+                    <option value="">Seleccione</option>
+                    <option value="Femenino">Femenino</option>
+                    <option value="Masculino">Masculino</option>
+                    <option value="Otro">Otro</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Ciudad</label>
+                <select name="ciudad" required class="input-box">
+                    <option value="">Seleccione</option>
+                    <option value="Pereira">Pereira</option>
+                    <option value="Dosquebradas">Dosquebradas</option>
+                    <option value="Manizales">Manizales</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- PASSWORD -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+            <input type="password" name="password" required minlength="6" class="input-box">
+        </div>
+
+        <!-- CONFIRM PASSWORD -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar contraseña</label>
+            <input type="password" name="confirmPassword" required minlength="6" class="input-box">
+        </div>
+
+        <!-- BOTÓN -->
+        <button type="submit"
+                id="registerBtn"
+                class="w-full py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition flex items-center justify-center gap-2">
+            <span>Registrarme</span>
+            <div id="loadingSpinner" class="hidden w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+        </button>
+
+        <p class="text-center text-gray-600 text-sm mt-3">
+            ¿Ya tienes cuenta?
+            <a href="login.php" class="text-green-700 hover:underline font-medium">Inicia sesión</a><br>
+            <a href="index.php" class="text-green-700 hover:underline font-medium">Volver al inicio</a>
+        </p>
+
+    </form>
+</div>
+
+<!-- ========== TAILWIND INPUT BOX STYLE ========== -->
+<style>
+.input-box {
+    @apply w-full px-3 py-2 border rounded-lg shadow-sm focus:ring-2 focus:ring-green-500 focus:border-green-500 transition;
+}
+</style>
+
+<!-- ========== NOTIFICACIONES ========== -->
 <script>
-// =========================
-//   Envío AJAX moderno
-// =========================
+function mostrarNotificacion(tipo, mensaje) {
+    const toast = document.getElementById("toast");
+
+    toast.className =
+        "fixed top-5 right-5 px-4 py-3 rounded-lg shadow-xl text-white " +
+        (tipo === "success" ? "bg-green-600" : "bg-red-600");
+
+    toast.textContent = mensaje;
+    toast.style.display = "block";
+
+    setTimeout(() => toast.style.display = "none", 3000);
+}
+</script>
+
+<!-- ========== SUBMIT AJAX ========== -->
+<script>
 document.getElementById("registerForm").addEventListener("submit", async function(e){
     e.preventDefault();
 
+    const pass = this.password.value;
+    const conf = this.confirmPassword.value;
+
+    if (pass !== conf) {
+        mostrarNotificacion("error", "Las contraseñas no coinciden");
+        return;
+    }
+
     const btn = document.getElementById("registerBtn");
     const spinner = document.getElementById("loadingSpinner");
+
     btn.disabled = true;
-    spinner.style.display = "inline-block";
+    spinner.classList.remove("hidden");
 
     const formData = new FormData(this);
     formData.append("ajax", "1");
@@ -228,7 +271,7 @@ document.getElementById("registerForm").addEventListener("submit", async functio
     const res = await req.json();
 
     btn.disabled = false;
-    spinner.style.display = "none";
+    spinner.classList.add("hidden");
 
     if (res.ok) {
         mostrarNotificacion("success", "Registro exitoso, redirigiendo...");
@@ -236,7 +279,6 @@ document.getElementById("registerForm").addEventListener("submit", async functio
     } else {
         mostrarNotificacion("error", res.msg);
     }
-
 });
 </script>
 

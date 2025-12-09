@@ -29,27 +29,36 @@ if (!function_exists('supabase_get')) {
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true); // 🔥 LEER HEADERS
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             "apikey: $supabase_key",
             "Authorization: Bearer $supabase_key",
             "Accept: application/json",
             "Content-Type: application/json",
-            // 👉 Esto permite que Supabase devuelva count cuando usamos select=count:*
             "Prefer: count=exact"
         ]);
 
-        $response = curl_exec($ch);
-        $code     = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $response   = curl_exec($ch);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $headers    = substr($response, 0, $headerSize);
+        $body       = substr($response, $headerSize);
+        $code       = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        $data = json_decode($response, true);
+        // Convertir JSON del body
+        $data = json_decode($body, true);
 
-        // Si no es JSON pero hubo respuesta, la devolvemos cruda
-        if ($data === null && $response !== '' && $response !== 'null') {
-            $data = ["raw" => $response];
+        // 🔥 Extraer TOTAL desde Content-Range
+        $total = null;
+        if (preg_match('/Content-Range:\s*\d+-\d+\/(\d+)/i', $headers, $match)) {
+            $total = intval($match[1]);
         }
 
-        return [$code, $data];
+        return [
+            $code,
+            $data ?: [],
+            $total // 👉 ahora tienes el total correcto de registros
+        ];
     }
 
     /* ===============================
