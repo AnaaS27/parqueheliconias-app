@@ -1,4 +1,5 @@
 <?php
+ob_start();
 session_start();
 require_once('../includes/verificar_admin.php');
 require_once("../includes/supabase.php");
@@ -135,6 +136,7 @@ if ($nuevo_estado === "confirmada") {
 // ================================
 $_SESSION['toast'] = ['mensaje' => '✅ Estado actualizado con éxito.', 'tipo' => 'exito'];
 header("Location: reservas.php");
+ob_end_flush();
 exit;
 
 ?>

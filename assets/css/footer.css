@@ -1,31 +1,27 @@
 /* =====================================================
-   FOOTER Y REDES - PARQUE DE LAS HELICONIAS
+   FOOTER MODERNO — PARQUE DE LAS HELICONIAS
    ===================================================== */
 
-/* ====== FOOTER ====== */
 .footer {
     background-color: #2e7d32;
     color: white;
     padding: 40px 20px 20px;
     font-family: "Poppins", sans-serif;
-    text-align: center;
 }
 
-/* Contenedor del footer */
+/* 🟢 GRID PRINCIPAL DEL FOOTER */
 .footer-container {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 1fr;
     gap: 40px;
-    text-align: center;
+    align-items: start;
+    max-width: 1400px;
+    margin: auto;
 }
 
-/* Secciones */
+/* Secciones del footer */
 .footer-section {
-    flex: 1 1 220px;
-    max-width: 250px;
-    min-width: 200px;
+    text-align: left;
 }
 
 .footer-section h3 {
@@ -35,237 +31,141 @@
     text-transform: uppercase;
 }
 
-.footer-section p,
-.footer-section a {
-    color: #ffffff;
-    font-size: 14px;
-    text-decoration: none;
-    line-height: 1.6;
-    display: block;
+/* ==============================================
+   🟢 COLUMNA 1 — LOGO + UBICACIÓN
+   ============================================== */
+.logo-col {
+    text-align: center;
 }
 
-/* Logo del footer */
 .footer-logo {
-    width: 120px;
-    margin: 0 auto 10px;
-    display: block;
+    width: 150px;
+    margin: 0 auto 15px;
 }
 
-/* Redes sociales */
-.social-icons {
-    display: flex;
-    justify-content: center;
-    gap: 15px;
+.ubicacion-box {
     margin-top: 10px;
 }
 
-.social-icon {
-    width: 28px;
-    height: 28px;
-    transition: transform 0.3s;
-}
-
-.social-icon:hover {
-    transform: scale(1.15);
-}
-
-/* Línea inferior */
-.footer-bottom {
-    text-align: center;
-    margin-top: 30px;
-    font-size: 13px;
-    border-top: 1px solid rgba(255, 255, 255, 0.3);
-    padding-top: 10px;
-    color: #ddd;
-}
-
-/* 📱 Responsive */
-@media (max-width: 768px) {
-    .footer-container {
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-    }
-
-    .footer-section {
-        max-width: 90%;
-        margin-bottom: 20px;
-    }
-}
-
-/* =====================================================
-   UBICACIÓN EN EL FOOTER
-   ===================================================== */
-
-.footer-section.ubicacion {
-    text-align: center;
-}
-
-.footer-section.ubicacion .ubicacion-link {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    text-decoration: none;
-    color: white;
-    transition: color 0.3s ease;
-}
-
-.footer-section.ubicacion .ubicacion-icon {
-    width: 25px;
-    height: auto;
-    vertical-align: middle;
-}
-
-.footer-section.ubicacion .ubicacion-link span {
-    display: inline-block;
-    text-align: left;
-    line-height: 1.5;
-    font-size: 15px;
-}
-
-.footer-section.ubicacion .ubicacion-link:hover {
-    color: #25d366;
-}
-
-/* =====================================================
-   REDES SOCIALES - ICONOS GRANDES
-   ===================================================== */
-
-.footer-section.redes {
-    text-align: center;
-}
-
-.footer-section.redes .social-icons {
-    display: flex;
-    justify-content: center;
-    gap: 18px;
-    margin-top: 8px;
-}
-
-.footer-section.redes .social-icons img {
-    width: 60px;
-    height: 60px;
-    object-fit: contain;
-    transition: transform 0.3s ease;
-}
-
-.footer-section.redes .social-icons img:hover {
-    transform: scale(1.2);
-    filter: brightness(1.2);
-}
-
-/* Ubicación general */
 .ubicacion-link {
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 12px;
+    color: white;
     text-decoration: none;
-    color: white;
-    gap: 15px;
-    margin-top: 10px;
-    font-size: 14px;
-    line-height: 1.5;
-    max-width: 280px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
-.icono-ubicacion {
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
-    flex-shrink: 0;
-}
-
-.texto-ubicacion {
-    display: flex;
-    flex-direction: column;
-    text-align: left;
-}
-
-.nombre-parque {
-    font-weight: 600;
-    font-size: 15px;
-    margin-bottom: 4px;
-    color: white;
 }
 
 .ubicacion-link:hover {
     color: #25d366;
 }
 
-/* =====================================================
-   ICONOS DE CONTACTO - WHATSAPP Y CORREO
-   ===================================================== */
+.icon-sm {
+    width: 22px;
+    height: auto;
+}
 
-.whatsapp-link,
-.correo-link {
-    display: inline-flex;
+.ubicacion-link span {
+    display: block;
+    line-height: 1.4;
+}
+
+/* ==============================================
+   ⏰ COLUMNA 2 — HORARIOS
+   ============================================== */
+.footer-section p {
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* ==============================================
+   ☎️ COLUMNA 3 — CONTACTO
+   ============================================== */
+
+.footer-link {
+    display: flex;
     align-items: center;
     gap: 10px;
-    text-decoration: none;
     color: white;
+    text-decoration: none;
+    margin: 8px 0;
     font-size: 15px;
-    font-weight: 500;
-    margin: 8px 12px;
-    line-height: 1;
-    vertical-align: middle;
 }
 
-.whatsapp-link .social-icon,
-.correo-link .social-icon {
+.footer-link:hover {
+    color: #25d366;
+}
+
+.footer-link img {
     width: 25px;
-    height: 25px;
-    object-fit: contain;
-    display: block;
 }
 
-.whatsapp-link:hover {
-    color: #25d366;
+/* ==============================================
+   📱 COLUMNA 4 — REDES SOCIALES
+   ============================================== */
+
+.redes-box {
+    display: flex;
+    gap: 15px;
+    margin-top: 10px;
 }
 
-.correo-link:hover {
-    color: #25d366;
+.icon-md {
+    width: 36px;
+    transition: transform 0.3s ease;
 }
 
-/* Sección contáctanos centrada */
-.footer-section.contacto {
-    text-align: center;
+.icon-md:hover {
+    transform: scale(1.15);
 }
 
-/* =====================================================
+/* ==============================================
    BOTÓN FLOTANTE WHATSAPP
-   ===================================================== */
-
+   ============================================== */
 .chat-btn {
     position: fixed;
     bottom: 20px;
     right: 20px;
     background-color: #be3634;
-    color: #000;
-    padding: 12px 20px;
+    color: white;
+    padding: 12px 22px;
     border-radius: 30px;
     font-weight: bold;
     text-decoration: none;
     box-shadow: 0px 4px 6px rgba(0,0,0,0.3);
-    transition: background 0.3s;
 }
 
 .chat-btn:hover {
     background-color: #e6b800;
 }
 
-/* Alineación perfecta para WhatsApp y correo */
-.footer-section.contacto a {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
+/* 🌐 RESPONSIVE */
+@media (max-width: 992px) {
+    .footer-container {
+        grid-template-columns: 1fr 1fr;
+        text-align: center;
+    }
+
+    .footer-section,
+    .logo-col {
+        text-align: center;
+    }
+
+    .ubicacion-link {
+        justify-content: center;
+    }
 }
 
-.footer-section.contacto a img {
-    width: 26px;
-    height: 26px;
-    flex-shrink: 0;
+@media (max-width: 600px) {
+    .footer-container {
+        grid-template-columns: 1fr;
+        text-align: center;
+    }
+
+    .footer-link {
+        justify-content: center;
+    }
+
+    .redes-box {
+        justify-content: center;
+    }
 }

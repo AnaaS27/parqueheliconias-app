@@ -225,5 +225,4 @@ function enviarCorreoCancelacion($correoDestino, $nombreUsuario, $id_reserva, $a
     return enviarCorreoBrevo($correoDestino, $nombreUsuario, $asunto, $html);
 }
 
-?>
 
