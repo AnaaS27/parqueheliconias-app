@@ -1,14 +1,12 @@
 <?php
 session_start();
 require_once('../includes/verificar_admin.php');
-require_once("../includes/supabase.php"); // ← ÚNICA conexión válida
+require_once("../includes/supabase.php");
+require_once("../includes/email_api.php");  // ← IMPORTANTE (correo)
 
 // --- Validar datos recibidos ---
 if (!isset($_POST['id_reserva']) || !isset($_POST['estado'])) {
-    $_SESSION['toast'] = [
-        'mensaje' => '❌ Datos incompletos para actualizar la reserva.',
-        'tipo' => 'error'
-    ];
+    $_SESSION['toast'] = ['mensaje' => '❌ Datos incompletos.', 'tipo' => 'error'];
     header("Location: reservas.php");
     exit;
 }
@@ -17,31 +15,51 @@ $id_reserva = intval($_POST['id_reserva']);
 $nuevo_estado = $_POST['estado'];
 
 // ================================
-// 1️⃣ Verificar que la reserva exista
+// 1️⃣ OBTENER RESERVA
 // ================================
-list($codeReserva, $reservaData) = supabase_get("reservas", ["id_reserva" => $id_reserva]);
+$endpointReserva = "reservas?id_reserva=eq.$id_reserva&select=*";
+list($codeRes, $dataReserva) = supabase_get($endpointReserva);
 
-if ($codeReserva !== 200 || empty($reservaData)) {
-    $_SESSION['toast'] = [
-        'mensaje' => '⚠ La reserva no existe.',
-        'tipo' => 'warning'
-    ];
+if ($codeRes !== 200 || empty($dataReserva)) {
+    $_SESSION['toast'] = ['mensaje' => '⚠ La reserva no existe.', 'tipo' => 'warning'];
     header("Location: reservas.php");
     exit;
 }
 
-$id_usuario = $reservaData[0]["id_usuario"];
+$reserva = $dataReserva[0];
+$id_usuario   = $reserva["id_usuario"];
+$id_actividad = $reserva["id_actividad"];
+$fecha_visita = $reserva["fecha_reserva"];
 
 // ================================
-// 2️⃣ Actualizar estado en Supabase
+// 2️⃣ OBTENER DATOS DEL USUARIO
 // ================================
-$updateData = ["estado" => $nuevo_estado];
+$endpointUser = "usuarios?id_usuario=eq.$id_usuario&select=nombre,apellido,correo";
+list($codeUser, $dataUser) = supabase_get($endpointUser);
 
-list($codeUpdate, $respUpdate) = supabase_update(
-    "reservas",
-    ["id_reserva" => $id_reserva],
-    $updateData
-);
+if ($codeUser !== 200 || empty($dataUser)) {
+    $_SESSION['toast'] = ['mensaje' => '⚠ No se encontró el usuario asociado.', 'tipo' => 'warning'];
+    header("Location: reservas.php");
+    exit;
+}
+
+$usuario = $dataUser[0];
+$nombreUsuario = $usuario["nombre"] . " " . $usuario["apellido"];
+$correoUsuario = $usuario["correo"];
+
+// ================================
+// 3️⃣ OBTENER ACTIVIDAD
+// ================================
+$endpointAct = "actividades?id_actividad=eq.$id_actividad&select=nombre";
+list($codeAct, $dataAct) = supabase_get($endpointAct);
+
+$nombreActividad = $dataAct[0]["nombre"] ?? "Actividad desconocida";
+
+// ================================
+// 4️⃣ ACTUALIZAR ESTADO
+// ================================
+$updateEndpoint = "reservas?id_reserva=eq.$id_reserva";
+list($codeUpdate, $respUpdate) = supabase_update($updateEndpoint, ["estado" => $nuevo_estado]);
 
 if ($codeUpdate !== 200 && $codeUpdate !== 204) {
     $_SESSION['toast'] = [
@@ -53,44 +71,70 @@ if ($codeUpdate !== 200 && $codeUpdate !== 204) {
 }
 
 // ================================
-// 3️⃣ Crear notificación según estado
+// 5️⃣ CREAR NOTIFICACIÓN + ENVIAR CORREO
 // ================================
-if ($nuevo_estado === 'confirmada') {
-    $titulo = '🎉 ¡Reserva Confirmada!';
-    $mensaje = 'Tu reserva ha sido confirmada por el administrador. ¡Te esperamos para disfrutar del Parque Las Heliconias!';
-    $tipo = 'exito';
+if ($nuevo_estado === "confirmada") {
 
-} elseif ($nuevo_estado === 'cancelada') {
-    $titulo = '❌ Reserva Cancelada';
-    $mensaje = 'Tu reserva ha sido cancelada por el administrador. Puedes volver a realizar otra cuando desees.';
-    $tipo = 'error';
+    // Notificación DB
+    supabase_insert("notificaciones", [
+        "id_usuario" => $id_usuario,
+        "id_reserva" => $id_reserva,
+        "titulo"     => "🎉 ¡Reserva Confirmada!",
+        "mensaje"    => "Tu reserva del Parque Las Heliconias fue confirmada.",
+        "tipo"       => "exito",
+        "fecha_creacion" => date("Y-m-d H:i:s"),
+        "leida" => false
+    ]);
+
+    // ENVIAR CORREO
+    enviarCorreoReserva(
+        $correoUsuario,
+        $nombreUsuario,
+        $id_reserva,
+        $fecha_visita,
+        $nombreActividad
+    );
+
+} elseif ($nuevo_estado === "cancelada") {
+
+    // Notificación DB
+    supabase_insert("notificaciones", [
+        "id_usuario" => $id_usuario,
+        "id_reserva" => $id_reserva,
+        "titulo"     => "❌ Reserva Cancelada",
+        "mensaje"    => "Tu reserva fue cancelada por el administrador.",
+        "tipo"       => "error",
+        "fecha_creacion" => date("Y-m-d H:i:s"),
+        "leida" => false
+    ]);
+
+    // ENVIAR CORREO
+    enviarCorreoCancelacion(
+        $correoUsuario,
+        $nombreUsuario,
+        $id_reserva,
+        $nombreActividad,
+        $fecha_visita
+    );
 
 } else {
-    $titulo = 'ℹ Estado actualizado';
-    $mensaje = 'El estado de tu reserva ha sido actualizado.';
-    $tipo = 'info';
+
+    supabase_insert("notificaciones", [
+        "id_usuario" => $id_usuario,
+        "id_reserva" => $id_reserva,
+        "titulo"     => "ℹ Estado actualizado",
+        "mensaje"    => "El estado de tu reserva ha sido modificado.",
+        "tipo"       => "info",
+        "fecha_creacion" => date("Y-m-d H:i:s"),
+        "leida" => false
+    ]);
 }
 
-$notifData = [
-    "id_usuario"    => $id_usuario,
-    "id_reserva"    => $id_reserva,
-    "titulo"        => $titulo,
-    "mensaje"       => $mensaje,
-    "tipo"          => $tipo,
-    "fecha_creacion"=> date("Y-m-d H:i:s"),
-    "leida"         => false
-];
-
-supabase_insert("notificaciones", $notifData);
-
 // ================================
-// 4️⃣ Mostrar mensaje final
+// 6️⃣ MENSAJE FINAL Y REDIRECCIÓN
 // ================================
-$_SESSION['toast'] = [
-    'mensaje' => '✅ Estado actualizado correctamente.',
-    'tipo' => 'exito'
-];
-
+$_SESSION['toast'] = ['mensaje' => '✅ Estado actualizado con éxito.', 'tipo' => 'exito'];
 header("Location: reservas.php");
 exit;
+
 ?>
