@@ -140,6 +140,22 @@
     background-color: #e6b800;
 }
 
+
+/* Centrar solo el logo en su columna */
+.footer-section.ubicacion {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* Centra el logo y su bloque */
+    text-align: center;  /* Centra el texto */
+}
+
+/* Ajusta el tamaño del logo si deseas */
+.footer-logo {
+    width: 180px; /* Ajusta según lo necesites */
+    margin-bottom: 10px;
+}
+
+
 /* =====================================================
    🌐 RESPONSIVE
    ===================================================== */
