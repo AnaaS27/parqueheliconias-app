@@ -4,7 +4,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 include('../includes/verificar_admin.php'); 
-include('../includes/supabase.php'); // ← reemplaza conexion.php por supabase.php
+require_once('../includes/supabase.php'); // ← reemplaza conexion.php por supabase.php
 
 // ===============================
 // 1️⃣ OBTENER ID ADMIN DESDE SESIÓN

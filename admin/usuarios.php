@@ -1,6 +1,6 @@
 <?php
 include('../includes/verificar_admin.php');
-include('../includes/supabase.php');
+require_once('../includes/supabase.php');
 include('header_admin.php');
 
 // =====================================
