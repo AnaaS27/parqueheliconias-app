@@ -25,39 +25,34 @@ if ($filtro === 'activos') {
     $filtrosQuery .= "&usuario_activo=eq.false";
 }
 
-// Búsqueda
+// Búsqueda (OR nombre / correo)
 if ($busqueda !== "") {
-    $texto = strtolower($busqueda);
-    // OR REAL de Supabase
-    $filtrosQuery .= "&or=(nombre.ilike.%$texto%,correo.ilike.%$texto%)";
+    // Supabase: or=(columna.ilike.*texto*,otra.ilike.*texto*)
+    $texto = urlencode("%{$busqueda}%");
+    $filtrosQuery .= "&or=(nombre.ilike.$texto,correo.ilike.$texto)";
 }
 
 // =====================================
-// 📌 OBTENER LISTA DE USUARIOS PAGINADOS
+// 📌 OBTENER LISTA DE USUARIOS (PÁGINA)
 // =====================================
-$endpoint =
-    "usuarios?select=*&order=id_usuario.asc&limit=$registrosPorPagina&offset=$offset" .
-    $filtrosQuery;
-
+$endpoint = "usuarios?select=*&order=id_usuario.asc&limit=$registrosPorPagina&offset=$offset" . $filtrosQuery;
 list($codeUsers, $usuarios) = supabase_get($endpoint);
-
 if ($codeUsers !== 200 || !is_array($usuarios)) {
     $usuarios = [];
 }
 
 // =====================================
-// 📌 CONTAR TOTAL REGISTROS
+// 📌 CONTAR TOTAL DE REGISTROS FILTRADOS
 // =====================================
 $countEndpoint = "usuarios?select=count:id" . $filtrosQuery;
-
 list($codeCount, $countData) = supabase_get($countEndpoint);
 
-$totalRegistros = ($codeCount === 200 && !empty($countData))
-    ? intval($countData[0]["count"])
-    : 0;
+$totalRegistros = 0;
+if ($codeCount === 200 && is_array($countData) && !empty($countData) && isset($countData[0]['count'])) {
+    $totalRegistros = intval($countData[0]['count']);
+}
 
-$totalPaginas = ceil($totalRegistros / $registrosPorPagina);
-
+$totalPaginas = max(1, ceil($totalRegistros / $registrosPorPagina));
 ?>
 
 <div class="max-w-7xl mx-auto px-4 py-6">
@@ -85,17 +80,17 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
 
                 <!-- CREAR USUARIO -->
                 <a href="crear_usuario.php"
-                class="px-4 py-2 bg-white text-green-700 rounded-lg shadow hover:bg-gray-100 font-medium text-sm flex items-center gap-2">
+                   class="px-4 py-2 bg-white text-green-700 rounded-lg shadow hover:bg-gray-100 font-medium text-sm flex items-center gap-2">
                     <i class="fa-solid fa-user-plus"></i> Crear Usuario
                 </a>
 
                 <!-- BUSCADOR -->
                 <form method="GET" class="flex items-center gap-2">
-                    <input type="hidden" name="filtro" value="<?= $filtro ?>">
+                    <input type="hidden" name="filtro" value="<?= htmlspecialchars($filtro) ?>">
 
                     <input type="text" name="buscar" placeholder="Buscar nombre o correo..."
-                        value="<?= htmlspecialchars($busqueda) ?>"
-                        class="px-3 py-2 rounded-lg bg-white text-gray-700 border border-gray-300 text-sm w-64 focus:ring">
+                           value="<?= htmlspecialchars($busqueda) ?>"
+                           class="px-3 py-2 rounded-lg bg-white text-gray-700 border border-gray-300 text-sm w-64 focus:ring">
 
                     <button class="px-3 py-2 bg-white text-green-700 rounded-lg hover:bg-gray-100 text-sm">
                         <i class="fa-solid fa-magnifying-glass"></i>
@@ -105,7 +100,7 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
                 <!-- SELECT FILTRO -->
                 <form method="GET">
                     <select name="filtro" onchange="this.form.submit()"
-                        class="px-3 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 text-sm focus:ring">
+                            class="px-3 py-2 rounded-lg bg-white text-gray-800 border border-gray-300 text-sm focus:ring">
                         <option value="activos"   <?= $filtro === 'activos' ? 'selected' : '' ?>>Activos</option>
                         <option value="inactivos" <?= $filtro === 'inactivos' ? 'selected' : '' ?>>Inactivos</option>
                         <option value="todos"     <?= $filtro === 'todos' ? 'selected' : '' ?>>Todos</option>
@@ -113,7 +108,6 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
                 </form>
 
             </div>
-
         </div>
 
         <!-- Tabla -->
@@ -152,7 +146,7 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
                             </td>
 
                             <td class="px-6 py-4">
-                                <?php if ($usuario['usuario_activo']): ?>
+                                <?php if (!empty($usuario['usuario_activo'])): ?>
                                     <span class="px-3 py-1 rounded-full bg-green-600 text-white text-xs flex items-center gap-1">
                                         <i class="fa-solid fa-circle-check"></i> Activo
                                     </span>
@@ -172,13 +166,13 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
                                 </a>
 
                                 <!-- Activar/Desactivar -->
-                                <?php if ($usuario['usuario_activo']): ?>
-                                    <button onclick="confirmarEliminacion(<?= $usuario['id_usuario'] ?>,'<?= $usuario['nombre'] ?>')"
+                                <?php if (!empty($usuario['usuario_activo'])): ?>
+                                    <button onclick="confirmarEliminacion(<?= $usuario['id_usuario'] ?>,'<?= htmlspecialchars($usuario['nombre']) ?>')"
                                             class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-xs flex items-center gap-1">
                                         <i class="fa-solid fa-trash"></i> Desactivar
                                     </button>
                                 <?php else: ?>
-                                    <button onclick="confirmarRestauracion(<?= $usuario['id_usuario'] ?>,'<?= $usuario['nombre'] ?>')"
+                                    <button onclick="confirmarRestauracion(<?= $usuario['id_usuario'] ?>,'<?= htmlspecialchars($usuario['nombre']) ?>')"
                                             class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs flex items-center gap-1">
                                         <i class="fa-solid fa-rotate-left"></i> Restaurar
                                     </button>
@@ -202,11 +196,10 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
                 </span>
 
                 <div class="flex gap-2">
-
                     <!-- Anterior -->
                     <?php if ($paginaActual > 1): ?>
-                        <a href="?pagina=<?= $paginaActual - 1 ?>&filtro=<?= $filtro ?>&buscar=<?= $busqueda ?>"
-                            class="px-3 py-1 border rounded-lg bg-gray-100 hover:bg-gray-200">
+                        <a href="?pagina=<?= $paginaActual - 1 ?>&filtro=<?= urlencode($filtro) ?>&buscar=<?= urlencode($busqueda) ?>"
+                           class="px-3 py-1 border rounded-lg bg-gray-100 hover:bg-gray-200">
                             <i class="fa-solid fa-chevron-left"></i>
                         </a>
                     <?php else: ?>
@@ -217,17 +210,17 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
 
                     <!-- Números -->
                     <?php for ($i = 1; $i <= $totalPaginas; $i++): ?>
-                        <a href="?pagina=<?= $i ?>&filtro=<?= $filtro ?>&buscar=<?= $busqueda ?>"
-                            class="px-3 py-1 border rounded-lg 
-                            <?= $i == $paginaActual ? 'bg-green-600 text-white' : 'bg-gray-100 hover:bg-gray-200' ?>">
+                        <a href="?pagina=<?= $i ?>&filtro=<?= urlencode($filtro) ?>&buscar=<?= urlencode($busqueda) ?>"
+                           class="px-3 py-1 border rounded-lg 
+                           <?= $i == $paginaActual ? 'bg-green-600 text-white' : 'bg-gray-100 hover:bg-gray-200' ?>">
                             <?= $i ?>
                         </a>
                     <?php endfor; ?>
 
                     <!-- Siguiente -->
                     <?php if ($paginaActual < $totalPaginas): ?>
-                        <a href="?pagina=<?= $paginaActual + 1 ?>&filtro=<?= $filtro ?>&buscar=<?= $busqueda ?>"
-                            class="px-3 py-1 border rounded-lg bg-gray-100 hover:bg-gray-200">
+                        <a href="?pagina=<?= $paginaActual + 1 ?>&filtro=<?= urlencode($filtro) ?>&buscar=<?= urlencode($busqueda) ?>"
+                           class="px-3 py-1 border rounded-lg bg-gray-100 hover:bg-gray-200">
                             <i class="fa-solid fa-chevron-right"></i>
                         </a>
                     <?php else: ?>
@@ -235,14 +228,12 @@ $totalPaginas = ceil($totalRegistros / $registrosPorPagina);
                             <i class="fa-solid fa-chevron-right"></i>
                         </span>
                     <?php endif; ?>
-
                 </div>
             </div>
 
         </div>
     </div>
 </div>
-
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
