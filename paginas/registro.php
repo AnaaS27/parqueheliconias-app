@@ -108,8 +108,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["ajax"])) {
     <title>Registrarse - Parque Las Heliconias</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- TAILWIND CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
 
     <link rel="icon" href="../assets/img/logoo.png">
 

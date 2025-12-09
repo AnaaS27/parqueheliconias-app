@@ -14,9 +14,8 @@ $rutaBase = (strpos($_SERVER['PHP_SELF'], '/paginas/') !== false || strpos($_SER
 // ==========================================
 // CONFIGURACIÓN SUPABASE (REST API)
 // ==========================================
-// ⚠ Mantenemos tus nombres originales tal cual están funcionando
-$supabase_url = getenv("DATABASE_URL");   // URL del proyecto Supabase
-$supabase_key = getenv("SUPABASE_KEY");   // Llave pública/anon
+$supabase_url = getenv("DATABASE_URL");
+$supabase_key = getenv("SUPABASE_KEY");
 
 
 // ==========================================
@@ -26,7 +25,6 @@ if (!function_exists('supabase_get')) {
     function supabase_get($endpoint) {
         global $supabase_url, $supabase_key;
 
-        // Asegurar que no haya doble slash
         $url = rtrim($supabase_url, "/") . "/rest/v1/" . $endpoint;
 
         $ch = curl_init($url);
@@ -47,31 +45,29 @@ if (!function_exists('supabase_get')) {
 }
 
 
-
 // ==========================================
-// NOTIFICACIONES (SI EL USUARIO ESTÁ LOGUEADO)
+// NOTIFICACIONES
 // ==========================================
 $notiCount = 0;
 
 if (isset($_SESSION['usuario_id'])) {
-
     $idUsuario = intval($_SESSION['usuario_id']);
 
-    // Supabase: contar notificaciones no leídas
     $endpoint = "notificaciones?select=count&id_usuario=eq.$idUsuario&leida=eq.false";
-
     [$code, $data] = supabase_get($endpoint);
 
     if ($code === 200 && !empty($data)) {
-        // Supabase devuelve: [ { "count": X } ]
         $notiCount = $data[0]["count"] ?? 0;
     }
 }
-
 ?>
+
+<!-- 🔗 TAILWIND (solo aquí, nunca en footer) -->
+<script src="https://cdn.tailwindcss.com"></script>
 
 <!-- 🔗 CSS DEL HEADER -->
 <link rel="stylesheet" href="<?= $rutaBase ?>assets/css/header.css">
+
 
 <header class="user-header">
 
