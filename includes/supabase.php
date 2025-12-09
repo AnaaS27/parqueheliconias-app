@@ -23,18 +23,23 @@ function supabase_get($endpoint) {
 
     $ch = curl_init($url);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         "apikey: $supabase_key",
         "Authorization: Bearer $supabase_key",
-        "Accept: application/json"
+        "Accept: application/json",
+        "Prefer: count=exact",     // <-- NECESARIO para paginar
+        "Range-Unit: items"       // <-- NECESARIO para que offset funcione
     ]);
 
     $response = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
     curl_close($ch);
 
     return [$code, json_decode($response, true)];
 }
+
 
 /* ===============================
    INSERT (POST)
